@@ -11,14 +11,20 @@ module Host {
   import opened HostIdentifiers
   import Network
   type ClientOperation(!new, ==)
+  type SequenceID = nat
 
   // Define your Message datatype here.
-  datatype Message = | PrePrepare(sender:HostId, view:nat, seqID:nat, clientOp:ClientOperation)
-                     | Prepare(sender:HostId, view:nat, seqID:nat, clientOp:ClientOperation)
-                     | Commit(sender:HostId, view:nat, seqID:nat, clientOp:ClientOperation)
+  datatype Message = | PrePrepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
+                     | Prepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
+                     | Commit(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
                      
   type PrepareProofSet = map<HostId, Message>
   type CommitProofSet = map<HostId, Message>
+  datatype WorkingWindow = WorkingWindow(
+    committedClientOperations:map<SequenceID, ClientOperation>,
+    preparesRcvd:map<SequenceID, PrepareProofSet>,
+    commitsRcvd:map<SequenceID, CommitProofSet>
+  )
 
   // Define your Host protocol state machine here.
   datatype Constants = Constants(myId:HostId, clusterSize:nat) {
@@ -36,9 +42,7 @@ module Host {
   datatype Variables = Variables(
     view:nat,
     viewIsActive:bool,
-    workingWindow:map<nat, ClientOperation>,
-    preparesRcvd:map<nat, PrepareProofSet>,
-    commitsRcvd:map<nat, CommitProofSet>
+    workingWindow:WorkingWindow
   )
 
   function CurentPrimary(v:Variables, c:Constants) : nat 
@@ -53,7 +57,7 @@ module Host {
     && p.PrePrepare?
     && p.sender == CurentPrimary(v, c)
     && p.view == v.view
-    && p.sender !in v.preparesRcvd[p.seqID]
+    && p.sender !in v.workingWindow.preparesRcvd[p.seqID]
     //&& forall k | k in v.preparesRcvd[p.seqID] :: k != p.sender
   }
 
