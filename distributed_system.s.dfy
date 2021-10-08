@@ -17,7 +17,7 @@ module DistributedSystem {
     network:Network.Constants) {
     predicate WF() {
       && |hosts| == NumHosts()
-      && (forall id | ValidHostId(id) :: hosts[id].GroupWF(id, NumHosts()))  // every host knows its id (and ids are unique)
+      && (forall id | ValidHostId(id) :: hosts[id].Configure(id, NumHosts()))  // every host knows its id (and ids are unique)
     }
   }
 

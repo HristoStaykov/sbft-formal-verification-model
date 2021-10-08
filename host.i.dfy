@@ -18,22 +18,39 @@ module Host {
                      | Prepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
                      | Commit(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
                      
-  type PrepareProofSet = map<HostId, Message>
-  type CommitProofSet = map<HostId, Message>
+  type PrepareProofSet = set<Message> 
+  predicate PrepareProofSetWF(ps:PrepareProofSet) {
+      && forall x | x in ps :: x.PrePrepare? || x.Prepare?
+  }
+
+  type CommitProofSet = set<Message>
+  predicate CommitProofSetWF(cs:CommitProofSet) {
+      && forall x | x in cs :: x.Commit?
+  }
+
   datatype WorkingWindow = WorkingWindow(
-    committedClientOperations:map<SequenceID, ClientOperation>,
-    preparesRcvd:map<SequenceID, PrepareProofSet>,
-    commitsRcvd:map<SequenceID, CommitProofSet>
-  )
+    committedClientOperations:imap<SequenceID, ClientOperation>,
+    preparesRcvd:imap<SequenceID, PrepareProofSet>,
+    commitsRcvd:imap<SequenceID, CommitProofSet>
+  ) {
+      // TODO: K(!new)
+      // predicate FullImap<K,V>(im:imap<K,V>) {
+      //   forall k :: k in im
+      // }
+  }
 
   // Define your Host protocol state machine here.
   datatype Constants = Constants(myId:HostId, clusterSize:nat) {
     // host constants coupled to DistributedSystem Constants:
     // DistributedSystem tells us our id so we can recognize inbound messages.
     // TODO(jonh): get rid of ValidHosts; move hostCount in here instead.
-    predicate GroupWF(id:HostId, replcasCount:nat) {
+    predicate WF() {
+      && clusterSize >= 4
+      && myId < clusterSize
+    }
+
+    predicate Configure(id:HostId, replcasCount:nat) {
       && myId == id
-      && replcasCount >= 4
       && clusterSize == replcasCount
     }
   }
@@ -45,20 +62,31 @@ module Host {
     workingWindow:WorkingWindow
   )
 
-  function CurentPrimary(v:Variables, c:Constants) : nat 
-    requires c.clusterSize >= 4
+  function CurentPrimary(c:Constants, v:Variables) : nat 
+    requires c.WF()
   {
     v.view % c.clusterSize
   }
 
-  predicate AcceptPrePrepare(p:Message, v:Variables, c:Constants)
-    requires c.clusterSize >= 4
-  {
-    && p.PrePrepare?
-    && p.sender == CurentPrimary(v, c)
+  predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message) {
+    && c.WF()
+    && v.viewIsActive
     && p.view == v.view
-    && p.sender !in v.workingWindow.preparesRcvd[p.seqID]
-    //&& forall k | k in v.preparesRcvd[p.seqID] :: k != p.sender
+    && p.PrePrepare?
+    && p.sender == CurentPrimary(c, v)
+    && (forall x | x in v.workingWindow.preparesRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
+  }
+
+  predicate RecvPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && var msg := msgOps.recv.value;
+    && RecvPrePrepareEnabled(c, v, msg)
+    && v' == v.(workingWindow := 
+                v.workingWindow.(preparesRcvd := 
+                                 v.workingWindow.preparesRcvd[msg.seqID := 
+                                 v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
   }
 
   predicate Init(c:Constants, v:Variables) {
@@ -68,7 +96,7 @@ module Host {
 
   // JayNF
   datatype Step =
-    | SomeStep
+    | RecvPrePrepareStep()
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
