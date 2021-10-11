@@ -68,7 +68,8 @@ module Host {
     v.view % c.clusterSize
   }
 
-  predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message) {
+  predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message)
+  {
     && c.WF()
     && v.viewIsActive
     && p.view == v.view
@@ -89,6 +90,16 @@ module Host {
                                  v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
   }
 
+  predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && c.WF()
+    && msgOps.recv.None?
+    && v.viewIsActive
+    && exists seqID | seqID in v.workingWindow.preparesRcvd :: 
+              exists message | message in v.workingWindow.preparesRcvd[seqID] && message.PrePrepare? :: 
+                  msgOps.send == Some(Prepare(c.myId, v.view, seqID, message.clientOp))
+  }
+  
   predicate Init(c:Constants, v:Variables) {
     && v.view == 0
     && v.viewIsActive == true
@@ -96,11 +107,15 @@ module Host {
 
   // JayNF
   datatype Step =
+// Recvs:
     | RecvPrePrepareStep()
+// Sends:
+    | SendPrepareStep()
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
-       case SomeStep => true
+       case RecvPrePrepareStep => RecvPrePrepare(c, v, v, msgOps)
+       case SendPrepareStep => SendPrepare(c, v, v, msgOps)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
