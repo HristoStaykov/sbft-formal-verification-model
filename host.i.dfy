@@ -29,7 +29,7 @@ module Host {
   }
 
   datatype WorkingWindow = WorkingWindow(
-    committedClientOperations:imap<SequenceID, ClientOperation>,
+    committedClientOperations:imap<SequenceID, Option<ClientOperation>>,
     preparesRcvd:imap<SequenceID, PrepareProofSet>,
     commitsRcvd:imap<SequenceID, CommitProofSet>
   ) {
@@ -103,6 +103,10 @@ module Host {
   predicate Init(c:Constants, v:Variables) {
     && v.view == 0
     && v.viewIsActive == true
+    && (forall x | x in v.workingWindow.committedClientOperations
+                :: v.workingWindow.committedClientOperations[x].None?)
+    && (forall x | x in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[x] == {})
+    && (forall x | x in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[x] == {})
   }
 
   // JayNF
