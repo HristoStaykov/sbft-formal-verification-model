@@ -28,15 +28,21 @@ module Host {
       && forall x | x in cs :: x.Commit?
   }
 
+  predicate FullImap<K(!new),V>(im:imap<K,V>) {
+    forall k :: k in im
+  }
+
   datatype WorkingWindow = WorkingWindow(
     committedClientOperations:imap<SequenceID, Option<ClientOperation>>,
     preparesRcvd:imap<SequenceID, PrepareProofSet>,
     commitsRcvd:imap<SequenceID, CommitProofSet>
   ) {
-      // TODO: K(!new)
-      // predicate FullImap<K,V>(im:imap<K,V>) {
-      //   forall k :: k in im
-      // }
+    predicate WF()
+    {
+      && FullImap(committedClientOperations)
+      && FullImap(preparesRcvd)
+      && FullImap(commitsRcvd)
+    }
   }
 
   // Define your Host protocol state machine here.
@@ -60,7 +66,12 @@ module Host {
     view:nat,
     viewIsActive:bool,
     workingWindow:WorkingWindow
-  )
+  ) {
+    predicate WF()
+    {
+      && workingWindow.WF()
+    }
+  }
 
   function CurentPrimary(c:Constants, v:Variables) : nat 
     requires c.WF()
@@ -70,7 +81,8 @@ module Host {
 
   predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message)
   {
-    && c.WF()
+    && c.WF() // TODO: move to vars
+    && v.WF()
     && v.viewIsActive
     && p.view == v.view
     && p.PrePrepare?
@@ -90,18 +102,20 @@ module Host {
                                  v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
   }
 
-  predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, prePrepare:Message)
   {
     && c.WF()
+    && v.WF()
     && msgOps.recv.None?
     && v.viewIsActive
-    && exists seqID | seqID in v.workingWindow.preparesRcvd :: 
-              exists message | message in v.workingWindow.preparesRcvd[seqID] && message.PrePrepare? :: 
-                  msgOps.send == Some(Prepare(c.myId, v.view, seqID, message.clientOp))
-                  && v' == v.(workingWindow := 
-                           v.workingWindow.(preparesRcvd := 
-                                 v.workingWindow.preparesRcvd[seqID := 
-                                 v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
+    && prePrepare.PrePrepare?
+    && prePrepare in v.workingWindow.preparesRcvd[prePrepare.seqID] 
+    && var seqID := prePrepare.seqID;
+    && msgOps.send == Some(Prepare(c.myId, v.view, seqID, prePrepare.clientOp))
+    && v' == v.(workingWindow := 
+             v.workingWindow.(preparesRcvd := 
+                   v.workingWindow.preparesRcvd[seqID := 
+                   v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
   }
   
   predicate Init(c:Constants, v:Variables) {
@@ -118,12 +132,12 @@ module Host {
 // Recvs:
     | RecvPrePrepareStep()
 // Sends:
-    | SendPrepareStep()
+    | SendPrepareStep(prePrepare:Message)
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
        case RecvPrePrepareStep => RecvPrePrepare(c, v, v, msgOps)
-       case SendPrepareStep => SendPrepare(c, v, v, msgOps)
+       case SendPrepareStep(prePrepare) => SendPrepare(c, v, v, msgOps, prePrepare)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
