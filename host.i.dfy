@@ -98,6 +98,10 @@ module Host {
     && exists seqID | seqID in v.workingWindow.preparesRcvd :: 
               exists message | message in v.workingWindow.preparesRcvd[seqID] && message.PrePrepare? :: 
                   msgOps.send == Some(Prepare(c.myId, v.view, seqID, message.clientOp))
+                  && v' == v.(workingWindow := 
+                           v.workingWindow.(preparesRcvd := 
+                                 v.workingWindow.preparesRcvd[seqID := 
+                                 v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
   }
   
   predicate Init(c:Constants, v:Variables) {
