@@ -107,10 +107,10 @@ module Host {
   predicate Init(c:Constants, v:Variables) {
     && v.view == 0
     && v.viewIsActive == true
-    && (forall x | x in v.workingWindow.committedClientOperations
-                :: v.workingWindow.committedClientOperations[x].None?)
-    && (forall x | x in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[x] == {})
-    && (forall x | x in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[x] == {})
+    && (forall seqID | seqID in v.workingWindow.committedClientOperations
+                :: v.workingWindow.committedClientOperations[seqID].None?)
+    && (forall seqID | seqID in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[seqID] == {})
+    && (forall seqID | seqID in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[seqID] == {})
   }
 
   // JayNF
