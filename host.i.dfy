@@ -152,9 +152,9 @@ module Host {
     && var seqID := prePrepare.seqID;
     && msgOps.send == Some(Prepare(c.myId, v.view, seqID, prePrepare.clientOp))
     && v' == v.(workingWindow := 
-             v.workingWindow.(preparesRcvd := 
-                   v.workingWindow.preparesRcvd[seqID := 
-                   v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
+                v.workingWindow.(preparesRcvd := 
+                                 v.workingWindow.preparesRcvd[seqID := 
+                                 v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
   }
 
   predicate SendCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, commit:Message)
@@ -167,9 +167,9 @@ module Host {
     && QuorumOfPrepares(c, v, seqID)
     && msgOps.send == Some(Commit(c.myId, v.view, seqID, commit.clientOp))
     && v' == v.(workingWindow := 
-         v.workingWindow.(commitsRcvd := 
-               v.workingWindow.commitsRcvd[seqID := 
-               v.workingWindow.commitsRcvd[seqID] + {msgOps.send.value}]))
+                v.workingWindow.(commitsRcvd := 
+                                 v.workingWindow.commitsRcvd[seqID := 
+                                 v.workingWindow.commitsRcvd[seqID] + {msgOps.send.value}]))
   }
   
   predicate Init(c:Constants, v:Variables) {
