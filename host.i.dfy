@@ -55,6 +55,18 @@ module Host {
       && myId < clusterSize
     }
 
+    function F() : nat // Max faulty tolerated
+      requires WF()
+    {
+      (clusterSize - 1) / 3
+    }
+
+    function AgreementQuorum() : nat 
+      requires WF()
+    {
+      2 * F() + 1
+    }
+
     predicate Configure(id:HostId, replcasCount:nat) {
       && myId == id
       && clusterSize == replcasCount
@@ -67,8 +79,9 @@ module Host {
     viewIsActive:bool,
     workingWindow:WorkingWindow
   ) {
-    predicate WF()
+    predicate WF(c:Constants)
     {
+      && c.WF()
       && workingWindow.WF()
     }
   }
@@ -81,8 +94,7 @@ module Host {
 
   predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message)
   {
-    && c.WF() // TODO: move to vars
-    && v.WF()
+    && v.WF(c)
     && v.viewIsActive
     && p.view == v.view
     && p.PrePrepare?
@@ -102,10 +114,37 @@ module Host {
                                  v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
   }
 
+  predicate RecvPrepareEnabled(c:Constants, v:Variables, p:Message)
+  {
+    && v.WF(c)
+    && v.viewIsActive
+    && p.view == v.view
+    && p.PrePrepare?
+    && p.sender != CurentPrimary(c, v)
+    && (forall x | x in v.workingWindow.preparesRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
+  }
+
+  predicate RecvPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && var msg := msgOps.recv.value;
+    && RecvPrepareEnabled(c, v, msg)
+    && v' == v.(workingWindow := 
+                v.workingWindow.(preparesRcvd := 
+                                 v.workingWindow.preparesRcvd[msg.seqID := 
+                                 v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
+  }
+
+  predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)
+  {
+    && v.WF(c)
+    && |v.workingWindow.preparesRcvd[seqID]| >= c.AgreementQuorum()
+  }
+
   predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, prePrepare:Message)
   {
-    && c.WF()
-    && v.WF()
+    && v.WF(c)
     && msgOps.recv.None?
     && v.viewIsActive
     && prePrepare.PrePrepare?
@@ -116,6 +155,21 @@ module Host {
              v.workingWindow.(preparesRcvd := 
                    v.workingWindow.preparesRcvd[seqID := 
                    v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
+  }
+
+  predicate SendCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, commit:Message)
+  {
+    && v.WF(c)
+    && msgOps.recv.None?
+    && v.viewIsActive
+    && commit.Commit?
+    && var seqID := commit.seqID;
+    && QuorumOfPrepares(c, v, seqID)
+    && msgOps.send == Some(Commit(c.myId, v.view, seqID, commit.clientOp))
+    && v' == v.(workingWindow := 
+         v.workingWindow.(commitsRcvd := 
+               v.workingWindow.commitsRcvd[seqID := 
+               v.workingWindow.commitsRcvd[seqID] + {msgOps.send.value}]))
   }
   
   predicate Init(c:Constants, v:Variables) {
@@ -131,13 +185,17 @@ module Host {
   datatype Step =
 // Recvs:
     | RecvPrePrepareStep()
+    | RecvPrepareStep()
 // Sends:
     | SendPrepareStep(prePrepare:Message)
+    | SendCommitStep(commit:Message)
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
-       case RecvPrePrepareStep => RecvPrePrepare(c, v, v, msgOps)
-       case SendPrepareStep(prePrepare) => SendPrepare(c, v, v, msgOps, prePrepare)
+       case RecvPrePrepareStep => RecvPrePrepare(c, v, v', msgOps)
+       case RecvPrepareStep => RecvPrepare(c, v, v', msgOps)
+       case SendPrepareStep(prePrepare) => SendPrepare(c, v, v', msgOps, prePrepare)
+       case SendCommitStep(commit) => SendCommit(c, v, v', msgOps, commit)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
