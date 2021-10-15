@@ -20,12 +20,18 @@ module Host {
                      
   type PrepareProofSet = set<Message> 
   predicate PrepareProofSetWF(ps:PrepareProofSet) {
-      && forall x | x in ps :: x.PrePrepare? || x.Prepare?
+      && forall x | x in ps :: x.Prepare?
   }
 
   type CommitProofSet = set<Message>
   predicate CommitProofSetWF(cs:CommitProofSet) {
       && forall x | x in cs :: x.Commit?
+  }
+
+  type PrePreparesRcvd = imap<SequenceID, Option<Message>>
+  predicate PrePreparesRcvdWF(prePreparesRcvd:PrePreparesRcvd) {
+    && FullImap(prePreparesRcvd)
+    && (forall x | x in prePreparesRcvd && prePreparesRcvd[x].Some? :: prePreparesRcvd[x].value.PrePrepare?)
   }
 
   predicate FullImap<K(!new),V>(im:imap<K,V>) {
@@ -34,6 +40,7 @@ module Host {
 
   datatype WorkingWindow = WorkingWindow(
     committedClientOperations:imap<SequenceID, Option<ClientOperation>>,
+    prePreparesRcvd:PrePreparesRcvd,
     preparesRcvd:imap<SequenceID, PrepareProofSet>,
     commitsRcvd:imap<SequenceID, CommitProofSet>
   ) {
@@ -42,11 +49,14 @@ module Host {
       && FullImap(committedClientOperations)
       && FullImap(preparesRcvd)
       && FullImap(commitsRcvd)
+      && PrePreparesRcvdWF(prePreparesRcvd)
+      && (forall seqID | seqID in preparesRcvd :: PrepareProofSetWF(preparesRcvd[seqID]))
+      && (forall seqID | seqID in commitsRcvd :: CommitProofSetWF(commitsRcvd[seqID]))
     }
   }
 
   // Define your Host protocol state machine here.
-  datatype Constants = Constants(myId:HostId, clusterSize:nat) {
+  datatype Constants = Constants(myId:HostId, clusterConfig:nat) {
     // host constants coupled to DistributedSystem Constants:
     // DistributedSystem tells us our id so we can recognize inbound messages.
     // TODO(jonh): get rid of ValidHosts; move hostCount in here instead.
@@ -92,6 +102,15 @@ module Host {
     v.view % c.clusterSize
   }
 
+  predicate SendPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && v.WF(c)
+    && msgOps.recv.None?
+    && msgOps.send.Some?
+    && var msg := msgOps.send.value;
+    && msg.PrePrepare? // We have a liveness bug here, we need some state that says for the client which operation ID-s we have executed
+  }
+
   predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
@@ -99,7 +118,7 @@ module Host {
     && p.view == v.view
     && p.PrePrepare?
     && p.sender == CurentPrimary(c, v)
-    && (forall x | x in v.workingWindow.preparesRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
+    && v.workingWindow.prePreparesRcvd[p.seqID].None?
   }
 
   predicate RecvPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
@@ -109,9 +128,8 @@ module Host {
     && var msg := msgOps.recv.value;
     && RecvPrePrepareEnabled(c, v, msg)
     && v' == v.(workingWindow := 
-                v.workingWindow.(preparesRcvd := 
-                                 v.workingWindow.preparesRcvd[msg.seqID := 
-                                 v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
+                v.workingWindow.(prePreparesRcvd := 
+                                 v.workingWindow.prePreparesRcvd[msg.seqID := Some(msg)]))
   }
 
   predicate RecvPrepareEnabled(c:Constants, v:Variables, p:Message)
@@ -119,8 +137,9 @@ module Host {
     && v.WF(c)
     && v.viewIsActive
     && p.view == v.view
-    && p.PrePrepare?
-    && p.sender != CurentPrimary(c, v)
+    && p.Prepare?
+    && v.workingWindow.prePreparesRcvd[p.seqID].Some?
+    && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
     && (forall x | x in v.workingWindow.preparesRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
   }
 
@@ -142,30 +161,28 @@ module Host {
     && |v.workingWindow.preparesRcvd[seqID]| >= c.AgreementQuorum()
   }
 
-  predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, prePrepare:Message)
+  predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
     && msgOps.recv.None?
     && v.viewIsActive
-    && prePrepare.PrePrepare?
-    && prePrepare in v.workingWindow.preparesRcvd[prePrepare.seqID] 
-    && var seqID := prePrepare.seqID;
-    && msgOps.send == Some(Prepare(c.myId, v.view, seqID, prePrepare.clientOp))
-    && v' == v.(workingWindow := 
-                v.workingWindow.(preparesRcvd := 
-                                 v.workingWindow.preparesRcvd[seqID := 
-                                 v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
+    && v.workingWindow.prePreparesRcvd[seqID].Some?
+    && msgOps.send == Some(Prepare(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
+    && v' == v
+    // && v' == v.(workingWindow := 
+    //             v.workingWindow.(preparesRcvd := 
+    //                              v.workingWindow.preparesRcvd[seqID := 
+    //                              v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
   }
 
-  predicate SendCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, commit:Message)
+  predicate SendCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
     && msgOps.recv.None?
     && v.viewIsActive
-    && commit.Commit?
-    && var seqID := commit.seqID;
     && QuorumOfPrepares(c, v, seqID)
-    && msgOps.send == Some(Commit(c.myId, v.view, seqID, commit.clientOp))
+    && v.workingWindow.prePreparesRcvd[seqID].Some?
+    && msgOps.send == Some(Commit(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
     && v' == v.(workingWindow := 
                 v.workingWindow.(commitsRcvd := 
                                  v.workingWindow.commitsRcvd[seqID := 
@@ -177,25 +194,32 @@ module Host {
     && v.viewIsActive == true
     && (forall seqID | seqID in v.workingWindow.committedClientOperations
                 :: v.workingWindow.committedClientOperations[seqID].None?)
+    && (forall seqID | seqID in v.workingWindow.prePreparesRcvd
+                :: v.workingWindow.prePreparesRcvd[seqID].None?)
     && (forall seqID | seqID in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[seqID] == {})
     && (forall seqID | seqID in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[seqID] == {})
   }
 
   // JayNF
   datatype Step =
-// Recvs:
+    //| RecvClientOperation()
+    | SendPrePrepareStep()
     | RecvPrePrepareStep()
+    | SendPrepareStep(seqID:SequenceID)
     | RecvPrepareStep()
-// Sends:
-    | SendPrepareStep(prePrepare:Message)
-    | SendCommitStep(commit:Message)
+    | SendCommitStep(seqID:SequenceID)
+    //| RecvCommitStep()
+    //| DoCommit(seqID:SequenceID)
+    //| Execute(seqID:SequenceID)
+    //| SendReplyToClient(seqID:SequenceID)
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
+       case SendPrePrepareStep() => SendPrePrepare(c, v, v', msgOps)
        case RecvPrePrepareStep => RecvPrePrepare(c, v, v', msgOps)
+       case SendPrepareStep(seqID) => SendPrepare(c, v, v', msgOps, seqID)
        case RecvPrepareStep => RecvPrepare(c, v, v', msgOps)
-       case SendPrepareStep(prePrepare) => SendPrepare(c, v, v', msgOps, prePrepare)
-       case SendCommitStep(commit) => SendCommit(c, v, v', msgOps, commit)
+       case SendCommitStep(seqID) => SendCommit(c, v, v', msgOps, seqID)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
