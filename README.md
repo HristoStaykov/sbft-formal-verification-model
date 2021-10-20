@@ -28,8 +28,8 @@ Run the image connected to your filesystem so you can edit in your OS, and then 
 mkdir work
 cd work
 docker container run -t -i --mount src="`pwd`",target=/home/dafnyserver/work,type=bind --workdir /home/dafnyserver/work jonhdotnet/summer_school:1.1 /bin/bash
-git clone https://github.com/GLaDOS-Michigan/summer-school-2021.git
-cd summer-school-2021/chapter01-basics
+git clone https://github.com/HristoStaykov/sbft-formal-verification-model.git
+cd sbft-formal-verification-model
 ```
 
 Now you can edit files using your preferred native OS editor under the work/
@@ -42,3 +42,23 @@ integrations for IDEs (Visual Studio, VSCode) and editors (Emacs, Vim).  You
 are certainly welcome to install Dafny natively and integrate it with your
 editor if you prefer.
 
+# Test that the image works
+
+From the container started as described in the previous step run:
+
+```bash
+    dafny host.i.dfy
+```
+
+If everything is working, you should see:
+
+```bash
+
+Dafny program verifier finished with 15 verified, 0 errors
+```
+
+# References
+
+This project builds on top of the concepts and framework described in
+https://github.com/GLaDOS-Michigan/summer-school-2021
+With help and support from Jon Howell. 
