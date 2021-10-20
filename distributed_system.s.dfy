@@ -3,21 +3,26 @@
 //#desc with one another over the network.
 
 include "host.i.dfy"
+include "cluster_config.s.dfy"
 
 // Before we get here, caller must define a type Message that we'll
 // use to instantiate network.s.dfy.
 
 module DistributedSystem {
   import opened HostIdentifiers
+  import ClusterConfig
   import Host
   import Network
 
   datatype Constants = Constants(
     hosts:seq<Host.Constants>,
-    network:Network.Constants) {
+    network:Network.Constants,
+    clusterConfig:ClusterConfig.Constants) {
     predicate WF() {
+      && clusterConfig.WF()
       && |hosts| == NumHosts()
-      && (forall id | ValidHostId(id) :: hosts[id].Configure(id, NumHosts()))  // every host knows its id (and ids are unique)
+      && clusterConfig.clusterSize == NumHosts()
+      && (forall id | ValidHostId(id) :: hosts[id].Configure(id, clusterConfig))  // every host knows its id (and ids are unique)
     }
   }
 

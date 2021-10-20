@@ -5,11 +5,13 @@
 // See exercise01.dfy for an English design of the protocol.
 
 include "network.s.dfy"
+include "cluster_config.s.dfy"
 
 module Host {
   import opened Library
   import opened HostIdentifiers
   import Network
+  import ClusterConfig
   type ClientOperation(!new, ==)
   type SequenceID = nat
 
@@ -56,30 +58,18 @@ module Host {
   }
 
   // Define your Host protocol state machine here.
-  datatype Constants = Constants(myId:HostId, clusterConfig:nat) {
+  datatype Constants = Constants(myId:HostId, clusterConfig:ClusterConfig.Constants) {
     // host constants coupled to DistributedSystem Constants:
     // DistributedSystem tells us our id so we can recognize inbound messages.
     // TODO(jonh): get rid of ValidHosts; move hostCount in here instead.
     predicate WF() {
-      && clusterSize >= 4
-      && myId < clusterSize
+      && clusterConfig.WF()
+      && myId < clusterConfig.clusterSize
     }
 
-    function F() : nat // Max faulty tolerated
-      requires WF()
-    {
-      (clusterSize - 1) / 3
-    }
-
-    function AgreementQuorum() : nat 
-      requires WF()
-    {
-      2 * F() + 1
-    }
-
-    predicate Configure(id:HostId, replcasCount:nat) {
+    predicate Configure(id:HostId, clusterConf:ClusterConfig.Constants) {
       && myId == id
-      && clusterSize == replcasCount
+      && clusterConfig == clusterConf
     }
   }
 
@@ -99,7 +89,7 @@ module Host {
   function CurentPrimary(c:Constants, v:Variables) : nat 
     requires c.WF()
   {
-    v.view % c.clusterSize
+    v.view % c.clusterConfig.clusterSize
   }
 
   predicate SendPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
@@ -158,7 +148,7 @@ module Host {
   predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)
   {
     && v.WF(c)
-    && |v.workingWindow.preparesRcvd[seqID]| >= c.AgreementQuorum()
+    && |v.workingWindow.preparesRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
   }
 
   predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)

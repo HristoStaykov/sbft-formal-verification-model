@@ -25,7 +25,7 @@ module Proof {
         && msg1.seqID == msg2.seqID
         && msg1.Commit?
         && msg2.Commit?
-        :: msg1 == msg2)
+        :: msg1.clientOp == msg2.clientOp)
   }
 
 
@@ -36,12 +36,16 @@ module Proof {
   function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Host.SequenceID) : set<Host.Message> 
   {
     set msg | && msg in v.network.sentMsgs 
-                 && msg.Prepare?
-                 && msg.seqID == seqID 
+              && msg.Prepare?
+              && msg.seqID == seqID
   }
 
-  predicate QuorumOfPreparesInNetwork(c: Constants, v:Variables, seqID:Host.SequenceID) {
-    && |getAllPreparesForSeqID()| >= Host.AgreementQuorum()
+  predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, seqID:Host.SequenceID, 
+                                      clientOperation:Host.ClientOperation) {
+    && v.WF(c)
+    && var prepares := getAllPreparesForSeqID(c, v, seqID);
+    && |prepares| >= c.clusterConfig.AgreementQuorum()
+    //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
   }
 
   lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step, h_step:Host.Step,
@@ -55,10 +59,14 @@ module Proof {
               && Host.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
               
     requires Inv(c, v)
-    ensures old_msg == new_msg
+    ensures old_msg.clientOp == new_msg.clientOp
   {
-    assert QuorumOfPreparesInNetwork(h_c, h_v, h_step.seqID, old_msg.clientOp);
-    assert QuorumOfPreparesInNetwork(h_c, h_v, h_step.seqID, new_msg.clientOp);
+    var h_c := c.hosts[step.id];
+    var h_v := v.hosts[step.id];
+    var h_v' := v'.hosts[step.id];
+
+    // assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, old_msg.clientOp);
+    // assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, new_msg.clientOp);
   }
 
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
@@ -83,17 +91,17 @@ module Proof {
           && msg1.seqID == msg2.seqID
           && msg1.Commit?
           && msg2.Commit?
-          ensures msg1 == msg2 {
+          ensures msg1.clientOp == msg2.clientOp {
             if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-              assert msg1 == msg2;
+              assert msg1.clientOp == msg2.clientOp;
             } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-              assert msg1 == msg2;
+              assert msg1.clientOp == msg2.clientOp;
             } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
               WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
-              assert msg1 == msg2;
+              assert msg1.clientOp == msg2.clientOp;
             } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
               WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
-              assert msg1 == msg2;
+              assert msg1.clientOp == msg2.clientOp;
             } else {
               assert false;
             }
