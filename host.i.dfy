@@ -40,6 +40,10 @@ module Host {
     forall k :: k in im
   }
 
+  // The Working Window data structure. Here Replicas keep the PrePrepare from the Primary
+  // and the votes from all peers. Once a Client Operation is committed by a given Replica
+  // to a specific Sequence ID (the Replica has collected the necessary quorum of votes from
+  // peers) the Client Operation is inserted in the committedClientOperations as appropriate.
   datatype WorkingWindow = WorkingWindow(
     committedClientOperations:imap<SequenceID, Option<ClientOperation>>,
     prePreparesRcvd:PrePreparesRcvd,
@@ -61,7 +65,7 @@ module Host {
   datatype Constants = Constants(myId:HostId, clusterConfig:ClusterConfig.Constants) {
     // host constants coupled to DistributedSystem Constants:
     // DistributedSystem tells us our id so we can recognize inbound messages.
-    // TODO(jonh): get rid of ValidHosts; move hostCount in here instead.
+    // clusterSize is in clusterConfig.
     predicate WF() {
       && clusterConfig.WF()
       && myId < clusterConfig.clusterSize
@@ -92,6 +96,8 @@ module Host {
     v.view % c.clusterConfig.clusterSize
   }
 
+  // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
+  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages.
   predicate SendPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && v.WF(c)
@@ -99,8 +105,10 @@ module Host {
     && msgOps.send.Some?
     && var msg := msgOps.send.value;
     && msg.PrePrepare? // We have a liveness bug here, we need some state that says for the client which operation ID-s we have executed
+    && v == v'
   }
 
+  // For clarity here we have extracted all preconditions that must hold for a Replica to accept a PrePrepare
   predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
@@ -111,6 +119,9 @@ module Host {
     && v.workingWindow.prePreparesRcvd[p.seqID].None?
   }
 
+  // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrePrepare
+  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages. In this 
+  // predicate we need to reflect in our next state that we have received the PrePrepare message.
   predicate RecvPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && msgOps.recv.Some?
@@ -122,6 +133,7 @@ module Host {
                                  v.workingWindow.prePreparesRcvd[msg.seqID := Some(msg)]))
   }
 
+  // For clarity here we have extracted all preconditions that must hold for a Replica to accept a Prepare
   predicate RecvPrepareEnabled(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
@@ -133,6 +145,9 @@ module Host {
     && (forall x | x in v.workingWindow.preparesRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
   }
 
+  // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrepare
+  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages. In this 
+  // predicate we need to reflect in our next state that we have received the Prepare message.
   predicate RecvPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && msgOps.recv.Some?
@@ -151,6 +166,10 @@ module Host {
     && |v.workingWindow.preparesRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
   }
 
+  // Predicate that describes what is needed and how we mutate the state v into v' when SendPrepare
+  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages. In this 
+  // predicate we do not mutate the next state, relying on the fact that messages will be broadcast
+  // and we will be able to receive our own message and store it as described in the RecvPrepare predicate.
   predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
@@ -159,12 +178,12 @@ module Host {
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Prepare(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
     && v' == v
-    // && v' == v.(workingWindow := 
-    //             v.workingWindow.(preparesRcvd := 
-    //                              v.workingWindow.preparesRcvd[seqID := 
-    //                              v.workingWindow.preparesRcvd[seqID] + {msgOps.send.value}]))
   }
 
+  // Predicate that describes what is needed and how we mutate the state v into v' when SendCommit
+  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages. In this 
+  // predicate we do not mutate the next state, relying on the fact that messages will be broadcast
+  // and we will be able to receive our own message and store it as described in the RecvCommit predicate.
   predicate SendCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
@@ -173,10 +192,7 @@ module Host {
     && QuorumOfPrepares(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Commit(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
-    && v' == v.(workingWindow := 
-                v.workingWindow.(commitsRcvd := 
-                                 v.workingWindow.commitsRcvd[seqID := 
-                                 v.workingWindow.commitsRcvd[seqID] + {msgOps.send.value}]))
+    && v' == v
   }
   
   predicate Init(c:Constants, v:Variables) {
