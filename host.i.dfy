@@ -90,7 +90,7 @@ module Host {
     }
   }
 
-  function CurentPrimary(c:Constants, v:Variables) : nat 
+  function CurrentPrimary(c:Constants, v:Variables) : nat 
     requires c.WF()
   {
     v.view % c.clusterConfig.clusterSize
@@ -103,6 +103,7 @@ module Host {
     && v.WF(c)
     && msgOps.recv.None?
     && msgOps.send.Some?
+    && CurrentPrimary(c, v) == c.myId
     && var msg := msgOps.send.value;
     && msg.PrePrepare? // We have a liveness bug here, we need some state that says for the client which operation ID-s we have executed
     && v == v'
@@ -115,7 +116,7 @@ module Host {
     && v.viewIsActive
     && p.view == v.view
     && p.PrePrepare?
-    && p.sender == CurentPrimary(c, v)
+    && p.sender == CurrentPrimary(c, v)
     && v.workingWindow.prePreparesRcvd[p.seqID].None?
   }
 
