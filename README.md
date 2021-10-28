@@ -28,7 +28,7 @@ newgrp docker
 (This is the slow thing; it includes a couple GB of Ubuntu.)
 
 ```bash
-    docker pull jonhdotnet/summer_school:1.1
+docker pull jonhdotnet/summer_school:1.1
 ```
 
 ## Run the image
@@ -58,18 +58,18 @@ editor if you prefer.
 From the container started as described in the previous step run:
 
 ```bash
-    dafny host.i.dfy
+dafny host.i.dfy
 ```
 
 If everything is working, you should see something like:
 
 ```bash
-
 Dafny program verifier finished with 15 verified, 0 errors
 ```
 
 # Acknowledgements and references
 
 This project builds on top of the concepts and framework described in
-https://github.com/GLaDOS-Michigan/summer-school-2021
-With help and support from Jon Howell. 
+https://github.com/GLaDOS-Michigan/summer-school-2021<br>
+
+Special thanks to Jon Howell for his help and support along the way.
