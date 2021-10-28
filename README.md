@@ -68,7 +68,7 @@ If everything is working, you should see something like:
 Dafny program verifier finished with 15 verified, 0 errors
 ```
 
-## Acknowledgements and references
+# Acknowledgements and references
 
 This project builds on top of the concepts and framework described in
 https://github.com/GLaDOS-Michigan/summer-school-2021
