@@ -50,7 +50,7 @@ From the container started as described in the previous step run:
     dafny host.i.dfy
 ```
 
-If everything is working, you should see:
+If everything is working, you should see something like:
 
 ```bash
 
