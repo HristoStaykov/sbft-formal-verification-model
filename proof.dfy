@@ -18,27 +18,13 @@ module Proof {
   import opened SafetySpec
 
 
-//  predicate FullImap<K(!new),V>(im:imap<K,V>) {
-//    forall k :: k in im
-//  }
-
-lemma KinM<K(!new),V>(k:K, m:imap<K,V>) 
-  requires Host.FullImap(m)
-  ensures k in m
-{
-
-}
-
   // Here's a predicate that will be very useful in constructing inviariant conjuncts.
   predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall hostIdx, seqID | 
               && ValidHostId(hostIdx)
-              && assert Host.FullImap(v.hosts[hostIdx].workingWindow.prePreparesRcvd); true
-              && assert Host.IsAnyKey(seqID); assert seqID in v.hosts[hostIdx].workingWindow.prePreparesRcvd; true
-              && assert Host.PrePreparesRcvdWF(v.hosts[hostIdx].workingWindow.prePreparesRcvd); true
-              && assert v.hosts[hostIdx].WF(c.hosts[hostIdx]); true
-              && v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].Some? 
+              && assert Host.TriggerKeyInFullImap(seqID, v.hosts[hostIdx].workingWindow.prePreparesRcvd);  // fix [seqID] index complaints
+                v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].Some? 
                 :: v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
   }
 

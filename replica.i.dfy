@@ -31,12 +31,24 @@ module Replica {
     && (forall x | x in prePreparesRcvd && prePreparesRcvd[x].Some? :: prePreparesRcvd[x].value.PrePrepare?)
   }
 
-  predicate IsAnyKey<K>(k:K) {
-    true
+  // TODO(hristo) move FullImap to a library. There's nothing Host-y about it.
+  predicate FullImap<K(!new),V>(im:imap<K,V>) {
+    forall k :: k in im
   }
 
-  predicate FullImap<K(!new),V>(im:imap<K,V>) {
-    forall k | IsAnyKey(k) :: k in im
+  // Warning: Dafny automation black magic.
+  // Everything is in a FullImap! But sometimes Dafny seems unable
+  // to trigger that forall. (jonh suspects the issue is related to
+  // the map being a deeply-nested expression, since Dafny gets the
+  // proof no problem here where the map is a top-level object.)
+  // So this predicate does "nothing" logically (it's just 'true'),
+  // but has the 'ensures' side-effect of pointing out the 'in' expression
+  // we need.
+  predicate TriggerKeyInFullImap<K(!new),V>(k:K, m:imap<K,V>) 
+    requires FullImap(m)
+    ensures k in m
+  {
+    true
   }
 
   // The Working Window data structure. Here Replicas keep the PrePrepare from the Primary
