@@ -17,7 +17,31 @@ module Proof {
   import opened DistributedSystem
   import opened SafetySpec
 
+
+//  predicate FullImap<K(!new),V>(im:imap<K,V>) {
+//    forall k :: k in im
+//  }
+
+lemma KinM<K(!new),V>(k:K, m:imap<K,V>) 
+  requires Host.FullImap(m)
+  ensures k in m
+{
+
+}
+
   // Here's a predicate that will be very useful in constructing inviariant conjuncts.
+  predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall hostIdx, seqID | 
+              && ValidHostId(hostIdx)
+              && assert Host.FullImap(v.hosts[hostIdx].workingWindow.prePreparesRcvd); true
+              && assert Host.IsAnyKey(seqID); assert seqID in v.hosts[hostIdx].workingWindow.prePreparesRcvd; true
+              && assert Host.PrePreparesRcvdWF(v.hosts[hostIdx].workingWindow.prePreparesRcvd); true
+              && assert v.hosts[hostIdx].WF(c.hosts[hostIdx]); true
+              && v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].Some? 
+                :: v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
+  }
+
   predicate CommitAgreement(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
@@ -25,7 +49,7 @@ module Proof {
         && msg1.seqID == msg2.seqID
         && msg1.Commit?
         && msg2.Commit?
-        :: msg1.clientOp == msg2.clientOp)
+        :: msg1 == msg2)
   }
 
 
@@ -59,14 +83,14 @@ module Proof {
               && Host.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
               
     requires Inv(c, v)
-    ensures old_msg.clientOp == new_msg.clientOp
+    ensures old_msg == new_msg
   {
     var h_c := c.hosts[step.id];
     var h_v := v.hosts[step.id];
     var h_v' := v'.hosts[step.id];
 
-    // assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, old_msg.clientOp);
-    // assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, new_msg.clientOp);
+    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, old_msg.clientOp);
+    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, new_msg.clientOp);
   }
 
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
@@ -91,17 +115,17 @@ module Proof {
           && msg1.seqID == msg2.seqID
           && msg1.Commit?
           && msg2.Commit?
-          ensures msg1.clientOp == msg2.clientOp {
+          ensures msg1 == msg2 {
             if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-              assert msg1.clientOp == msg2.clientOp;
+              assert msg1 == msg2;
             } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-              assert msg1.clientOp == msg2.clientOp;
+              assert msg1 == msg2;
             } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
               WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
-              assert msg1.clientOp == msg2.clientOp;
+              assert msg1 == msg2;
             } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
               WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
-              assert msg1.clientOp == msg2.clientOp;
+              assert msg1 == msg2;
             } else {
               assert false;
             }

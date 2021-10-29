@@ -31,8 +31,12 @@ module Replica {
     && (forall x | x in prePreparesRcvd && prePreparesRcvd[x].Some? :: prePreparesRcvd[x].value.PrePrepare?)
   }
 
+  predicate IsAnyKey<K>(k:K) {
+    true
+  }
+
   predicate FullImap<K(!new),V>(im:imap<K,V>) {
-    forall k :: k in im
+    forall k | IsAnyKey(k) :: k in im
   }
 
   // The Working Window data structure. Here Replicas keep the PrePrepare from the Primary
