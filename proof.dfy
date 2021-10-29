@@ -28,6 +28,12 @@ module Proof {
                 :: v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
   }
 
+  predicate EveryCommitMsgIsSupportedByAQuorumOfPrepares(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall commitMsg | commitMsg in v.network.sentMsgs && commitMsg.Commit? ::
+          QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
+  }
+
   predicate CommitAgreement(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
@@ -40,6 +46,8 @@ module Proof {
 
 
   predicate Inv(c: Constants, v:Variables) {
+    && RecordedPreparesRecvdCameFromNetwork(c, v)
+    && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
     && CommitAgreement(c, v)
   }
 
@@ -67,16 +75,18 @@ module Proof {
               && Host.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
               && h_step.SendCommitStep?
               && Host.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
-              
+    requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs
+    requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs
+    requires && old_msg.seqID == new_msg.seqID
+             && old_msg.Commit?
+             && new_msg.Commit?
+
     requires Inv(c, v)
     ensures old_msg == new_msg
   {
-    var h_c := c.hosts[step.id];
-    var h_v := v.hosts[step.id];
-    var h_v' := v'.hosts[step.id];
-
     assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, old_msg.clientOp);
     assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, new_msg.clientOp);
+    assert old_msg == new_msg;
   }
 
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
