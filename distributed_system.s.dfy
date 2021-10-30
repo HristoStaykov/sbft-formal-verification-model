@@ -21,7 +21,7 @@ module DistributedSystem {
     predicate WF() {
       && clusterConfig.WF()
       && |hosts| == NumHosts()
-      && clusterConfig.clusterSize == NumHosts()
+      && clusterConfig.N() == NumHosts()
       && (forall id | ValidHostId(id) :: hosts[id].Configure(id, clusterConfig))  // every host knows its id (and ids are unique)
     }
   }
