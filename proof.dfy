@@ -1,4 +1,4 @@
-
+include "library/Library.dfy"
 include "distributed_system.s.dfy"
 
 module SafetySpec {
@@ -16,14 +16,14 @@ module Proof {
   import Host
   import opened DistributedSystem
   import opened SafetySpec
-
+  import Library
 
   // Here's a predicate that will be very useful in constructing inviariant conjuncts.
   predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall hostIdx, seqID | 
               && ValidHostId(hostIdx)
-              && assert Host.TriggerKeyInFullImap(seqID, v.hosts[hostIdx].workingWindow.prePreparesRcvd);  // fix [seqID] index complaints
+              && assert Library.TriggerKeyInFullImap(seqID, v.hosts[hostIdx].workingWindow.prePreparesRcvd);
                 v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].Some? 
                 :: v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
   }
@@ -34,7 +34,7 @@ module Proof {
           QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
   }
 
-  predicate CommitAgreement(c:Constants, v:Variables) {
+  predicate HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
@@ -48,7 +48,7 @@ module Proof {
   predicate Inv(c: Constants, v:Variables) {
     && RecordedPreparesRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
-    && CommitAgreement(c, v)
+    && HonestReplicasLockOnCommitForGivenView(c, v)
   }
 
   function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Host.SequenceID) : set<Host.Message> 
@@ -89,6 +89,30 @@ module Proof {
     assert old_msg == new_msg;
   }
 
+  predicate NoNewCommits(c: Constants, v:Variables, v':Variables)
+  {
+    && (forall msg | msg in v'.network.sentMsgs && msg.Commit? :: msg in v.network.sentMsgs)
+  }
+
+  lemma QuorumOfPreparesInNetworkMonotonic(c: Constants, v:Variables, v':Variables, step:Step, h_step:Host.Step)
+    requires NextStep(c, v, v', step)
+    requires var h_c := c.hosts[step.id];
+             var h_v := v.hosts[step.id];
+             var h_v' := v'.hosts[step.id];
+             Host.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
+    ensures NoNewCommits(c, v, v')
+             ==> (forall seqID, clientOP | QuorumOfPreparesInNetwork(c, v, seqID, clientOP)
+                                        :: QuorumOfPreparesInNetwork(c, v', seqID, clientOP))
+  {
+    forall seqID, clientOP | QuorumOfPreparesInNetwork(c, v, seqID, clientOP)
+                                  ensures QuorumOfPreparesInNetwork(c, v', seqID, clientOP)
+    {
+      var prepares := getAllPreparesForSeqID(c, v, seqID);
+      var prepares' := getAllPreparesForSeqID(c, v', seqID);
+      Library.SubsetCardinality(prepares, prepares');
+    }
+  }
+
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
@@ -99,6 +123,7 @@ module Proof {
     var h_v := v.hosts[step.id];
     var h_v' := v'.hosts[step.id];
     var h_step :| Host.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
+    QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step);
     match h_step
       case SendPrePrepareStep() => { assert Inv(c, v'); }
       case RecvPrePrepareStep => { assert Inv(c, v'); }
