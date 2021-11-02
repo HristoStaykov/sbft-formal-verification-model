@@ -31,7 +31,7 @@ module Proof {
   predicate EveryCommitMsgIsSupportedByAQuorumOfPrepares(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | commitMsg in v.network.sentMsgs && commitMsg.Commit? ::
-          QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
+          QuorumOfPreparesInNetwork(c, v, commitMsg.seqID) )
   }
 
   predicate HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
@@ -39,6 +39,7 @@ module Proof {
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
         && msg1.seqID == msg2.seqID
+        && msg1.sender == msg2.sender
         && msg1.Commit?
         && msg2.Commit?
         :: msg1 == msg2)
@@ -58,11 +59,15 @@ module Proof {
               && msg.seqID == seqID
   }
 
-  predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, seqID:Host.SequenceID, 
-                                      clientOperation:Host.ClientOperation) {
+  function setOfSendersForMsgs(msgs:set<Host.Message>) : set<HostIdentifiers.HostId> {
+    //set sender | sender in AllHosts() && (exists msg | msg in msgs :: msg.sender == sender)
+    set msg | msg in msgs :: msg.sender
+  }
+
+  predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, seqID:Host.SequenceID) {
     && v.WF(c)
     && var prepares := getAllPreparesForSeqID(c, v, seqID);
-    && |prepares| >= c.clusterConfig.AgreementQuorum()
+    && |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum()
     //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
   }
 
@@ -84,8 +89,8 @@ module Proof {
     requires Inv(c, v)
     ensures old_msg == new_msg
   {
-    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, old_msg.clientOp);
-    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID, new_msg.clientOp);
+    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID);
+    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID);
     assert old_msg == new_msg;
   }
 
@@ -101,11 +106,11 @@ module Proof {
              var h_v' := v'.hosts[step.id];
              Host.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
     ensures NoNewCommits(c, v, v')
-             ==> (forall seqID, clientOP | QuorumOfPreparesInNetwork(c, v, seqID, clientOP)
-                                        :: QuorumOfPreparesInNetwork(c, v', seqID, clientOP))
+             ==> (forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
+                                        :: QuorumOfPreparesInNetwork(c, v', seqID))
   {
-    forall seqID, clientOP | QuorumOfPreparesInNetwork(c, v, seqID, clientOP)
-                                  ensures QuorumOfPreparesInNetwork(c, v', seqID, clientOP)
+    forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
+                                  ensures QuorumOfPreparesInNetwork(c, v', seqID)
     {
       var prepares := getAllPreparesForSeqID(c, v, seqID);
       var prepares' := getAllPreparesForSeqID(c, v', seqID);
