@@ -83,6 +83,7 @@ module Proof {
     requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs
     requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs
     requires && old_msg.seqID == new_msg.seqID
+             && old_msg.sender == new_msg.sender
              && old_msg.Commit?
              && new_msg.Commit?
 
@@ -112,9 +113,9 @@ module Proof {
     forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
                                   ensures QuorumOfPreparesInNetwork(c, v', seqID)
     {
-      var prepares := getAllPreparesForSeqID(c, v, seqID);
-      var prepares' := getAllPreparesForSeqID(c, v', seqID);
-      Library.SubsetCardinality(prepares, prepares');
+      var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, seqID));
+      var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', seqID));
+      Library.SubsetCardinality(senders, senders');
     }
   }
 
@@ -135,10 +136,12 @@ module Proof {
       case SendPrepareStep(seqID) => { assert Inv(c, v'); }
       case RecvPrepareStep => { assert Inv(c, v'); }
       case SendCommitStep(seqID) => {
+        // HonestReplicasLockOnACommitForAGiveView
         forall msg1, msg2 | 
           && msg1 in v'.network.sentMsgs 
           && msg2 in v'.network.sentMsgs 
           && msg1.seqID == msg2.seqID
+          && msg1.sender == msg2.sender
           && msg1.Commit?
           && msg2.Commit?
           ensures msg1 == msg2 {
@@ -156,6 +159,23 @@ module Proof {
               assert false;
             }
             
+          }
+          // A prove of EveryCommitMsgIsSupportedByAQuorumOfPrepares
+          forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
+            QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
+            if(commitMsg in v.network.sentMsgs) {
+              // This is another example of QuorumOfPreparesInNetworkMonotonic but with a sent Commit.
+              var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
+              var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
+              Library.SubsetCardinality(senders, senders');
+              assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
+            } else {
+              var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
+              assert |prepares'| >= c.clusterConfig.AgreementQuorum();
+              var senders' := setOfSendersForMsgs(prepares');
+
+              assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
+            }
           }
           assert Inv(c, v'); 
       }
