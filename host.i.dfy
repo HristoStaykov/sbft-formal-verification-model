@@ -65,10 +65,9 @@ module Host {
   datatype Constants = Constants(myId:HostId, clusterConfig:ClusterConfig.Constants) {
     // host constants coupled to DistributedSystem Constants:
     // DistributedSystem tells us our id so we can recognize inbound messages.
-    // clusterSize is in clusterConfig.
     predicate WF() {
       && clusterConfig.WF()
-      && myId < clusterConfig.clusterSize
+      && myId < clusterConfig.N()
     }
 
     predicate Configure(id:HostId, clusterConf:ClusterConfig.Constants) {
@@ -93,7 +92,7 @@ module Host {
   function CurrentPrimary(c:Constants, v:Variables) : nat 
     requires c.WF()
   {
-    v.view % c.clusterConfig.clusterSize
+    v.view % c.clusterConfig.N()
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
