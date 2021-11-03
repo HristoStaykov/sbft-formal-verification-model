@@ -19,13 +19,30 @@ module Proof {
   import Library
 
   // Here's a predicate that will be very useful in constructing inviariant conjuncts.
-  predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
+  predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall hostIdx, seqID | 
               && ValidHostId(hostIdx)
               && assert Library.TriggerKeyInFullImap(seqID, v.hosts[hostIdx].workingWindow.prePreparesRcvd);
                 v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].Some? 
                 :: v.hosts[hostIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
+  }
+
+  predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId) {
+    && v.WF(c)
+    && ValidHostId(observer)
+    && (forall sender, seqID | 
+              && ValidHostId(sender)
+              && assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].workingWindow.preparesRcvd);
+                sender in v.hosts[observer].workingWindow.preparesRcvd[seqID]
+                :: v.hosts[observer].workingWindow.preparesRcvd[seqID][sender] in v.network.sentMsgs)
+  }
+
+  predicate RecordedPreparesInAllHostsRecvdCameFromNetwork(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall observer | 
+            && ValidHostId(observer)
+                :: RecordedPreparesRecvdCameFromNetwork(c, v, observer))
   }
 
   predicate EveryCommitMsgIsSupportedByAQuorumOfPrepares(c:Constants, v:Variables) {
@@ -47,7 +64,8 @@ module Proof {
 
 
   predicate Inv(c: Constants, v:Variables) {
-    && RecordedPreparesRecvdCameFromNetwork(c, v)
+    && RecordedPrePreparesRecvdCameFromNetwork(c, v)
+    && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
     && HonestReplicasLockOnCommitForGivenView(c, v)
   }
@@ -170,9 +188,38 @@ module Proof {
               Library.SubsetCardinality(senders, senders');
               assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
             } else {
+              //|v.workingWindow.preparesRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
+              var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
               var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
-              assert |prepares'| >= c.clusterConfig.AgreementQuorum();
-              var senders' := setOfSendersForMsgs(prepares');
+              calc {
+                |setOfSendersForMsgs(prepares')|;
+                == {assume false;} |setOfSendersForMsgs(prepares)|;
+                >= { 
+                  var bigSet := setOfSendersForMsgs(prepares);
+                  var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+                  forall sender | sender in smallSet
+                    ensures sender in bigSet {
+                    var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+                    assert msg in prepares by {
+                      var observer := step.id;
+                      var seqID := commitMsg.seqID;
+                      assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].workingWindow.preparesRcvd);
+                      assert ValidHostId(sender);
+                      assert sender in v.hosts[observer].workingWindow.preparesRcvd[seqID];
+                      assert RecordedPreparesRecvdCameFromNetwork(c, v, observer);
+                      assert v.hosts[observer].workingWindow.preparesRcvd[seqID][sender] in v.network.sentMsgs;
+                    }
+                    assert sender in bigSet by {
+                      assume false;
+                    }
+                  }
+                  Library.SubsetCardinality(smallSet, bigSet);
+                  assert |smallSet| <= |bigSet|;
+                }
+                |h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys|;
+                >= h_c.clusterConfig.AgreementQuorum();
+                == c.clusterConfig.AgreementQuorum();
+              }
 
               assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
             }

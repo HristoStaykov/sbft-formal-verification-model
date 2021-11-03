@@ -134,7 +134,7 @@ module Replica {
     && p.Prepare?
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
-    && p.sender !in v.workingWindow.preparesRcvd[p.seqID]
+    && p.sender !in v.workingWindow.preparesRcvd[p.seqID] // We stick to the first vote from a peer.
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrepare
