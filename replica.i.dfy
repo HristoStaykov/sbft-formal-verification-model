@@ -15,9 +15,9 @@ module Replica {
   import Network
   import ClusterConfig
                      
-  type PrepareProofSet = set<Message> 
+  type PrepareProofSet = map<HostId, Message> 
   predicate PrepareProofSetWF(ps:PrepareProofSet) {
-      && forall x | x in ps :: x.Prepare?
+      && forall x | x in ps :: ps[x].Prepare?
   }
 
   type CommitProofSet = set<Message>
@@ -102,6 +102,7 @@ module Replica {
   predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && ValidHostId(p.sender)
     && v.viewIsActive
     && p.view == v.view
     && p.PrePrepare?
@@ -127,12 +128,13 @@ module Replica {
   predicate IsValidPrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && ValidHostId(p.sender)
     && v.viewIsActive
     && p.view == v.view
     && p.Prepare?
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
-    && (forall x | x in v.workingWindow.preparesRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
+    && p.sender !in v.workingWindow.preparesRcvd[p.seqID]
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrepare
@@ -147,7 +149,7 @@ module Replica {
     && v' == v.(workingWindow := 
                 v.workingWindow.(preparesRcvd := 
                                  v.workingWindow.preparesRcvd[msg.seqID := 
-                                 v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
+                                 v.workingWindow.preparesRcvd[msg.seqID][msg.sender := msg]]))
   }
 
   // 
@@ -233,7 +235,7 @@ module Replica {
                 :: v.workingWindow.committedClientOperations[seqID].None?)
     && (forall seqID | seqID in v.workingWindow.prePreparesRcvd
                 :: v.workingWindow.prePreparesRcvd[seqID].None?)
-    && (forall seqID | seqID in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[seqID] == {})
+    && (forall seqID | seqID in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[seqID] == map[])
     && (forall seqID | seqID in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[seqID] == {})
   }
 
