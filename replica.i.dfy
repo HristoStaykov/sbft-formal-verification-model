@@ -56,9 +56,10 @@ module Replica {
   datatype Constants = Constants(myId:HostId, clusterConfig:ClusterConfig.Constants) {
     // host constants coupled to DistributedSystem Constants:
     // DistributedSystem tells us our id so we can recognize inbound messages.
+    // clusterSize is in clusterConfig.
     predicate WF() {
       && clusterConfig.WF()
-      && myId < clusterConfig.N()
+      && ValidHostId(myId)
     }
 
     predicate Configure(id:HostId, clusterConf:ClusterConfig.Constants) {

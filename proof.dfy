@@ -32,10 +32,12 @@ module Proof {
     && v.WF(c)
     && ValidHostId(observer)
     && (forall sender, seqID | 
-              && ValidHostId(sender)
               && assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].workingWindow.preparesRcvd);
                 sender in v.hosts[observer].workingWindow.preparesRcvd[seqID]
-                :: v.hosts[observer].workingWindow.preparesRcvd[seqID][sender] in v.network.sentMsgs)
+                :: (&& var msg := v.hosts[observer].workingWindow.preparesRcvd[seqID][sender];
+                    && msg in v.network.sentMsgs
+                    && msg.sender == sender
+                    && msg.seqID == seqID)) // The key we stored matches what is in the msg
   }
 
   predicate RecordedPreparesInAllHostsRecvdCameFromNetwork(c:Constants, v:Variables) {
@@ -64,6 +66,7 @@ module Proof {
 
 
   predicate Inv(c: Constants, v:Variables) {
+    && OnlyValidHostsSendMsgs(c, v)
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
     && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
@@ -109,7 +112,7 @@ module Proof {
     ensures old_msg == new_msg
   {
     assert QuorumOfPreparesInNetwork(c, v, h_step.seqID);
-    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID);
+    assert QuorumOfPreparesInNetwork(c, v', h_step.seqID);
     assert old_msg == new_msg;
   }
 
@@ -137,6 +140,34 @@ module Proof {
     }
   }
 
+  predicate OnlyValidHostsSendMsgs(c: Constants, v:Variables) {
+    && forall msg | msg in v.network.sentMsgs :: ValidHostId(msg.sender)
+  }
+
+  lemma VerifyOnlyValidHostsSendMsgs(c: Constants, v:Variables, v':Variables, step:Step, h_step:Host.Step)
+    requires NextStep(c, v, v', step)
+    requires Inv(c, v)
+    requires var h_c := c.hosts[step.id];
+             var h_v := v.hosts[step.id];
+             var h_v' := v'.hosts[step.id];
+             Host.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
+  {
+    assert OnlyValidHostsSendMsgs(c, v);
+    assert OnlyValidHostsSendMsgs(c, v');
+    forall msg | msg in v'.network.sentMsgs ensures ValidHostId(msg.sender) {
+      match h_step
+        case SendPrePrepareStep() => { 
+          assert v.network.sentMsgs + {step.msgOps.send.value} == v'.network.sentMsgs;
+          assert ValidHostId(step.msgOps.send.value.sender);
+        }
+        case RecvPrePrepareStep => { assert v.network.sentMsgs == v'.network.sentMsgs; }
+        case SendPrepareStep(seqID) => { assert v.network.sentMsgs + {step.msgOps.send.value} == v'.network.sentMsgs; }
+        case RecvPrepareStep => { assert v.network.sentMsgs == v'.network.sentMsgs; }
+        case SendCommitStep(seqID) => { assert v.network.sentMsgs + {step.msgOps.send.value} == v'.network.sentMsgs; }
+    
+    }
+  }
+
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
@@ -148,6 +179,7 @@ module Proof {
     var h_v' := v'.hosts[step.id];
     var h_step :| Host.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
     QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step);
+    VerifyOnlyValidHostsSendMsgs(c, v, v', step, h_step);
     match h_step
       case SendPrePrepareStep() => { assert Inv(c, v'); }
       case RecvPrePrepareStep => { assert Inv(c, v'); }
@@ -204,17 +236,24 @@ module Proof {
                       var observer := step.id;
                       var seqID := commitMsg.seqID;
                       assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].workingWindow.preparesRcvd);
+                      assert sender in v.hosts[observer].workingWindow.preparesRcvd[seqID];
+                      assert msg.sender == sender;
+                      assert msg in v.network.sentMsgs;
+                      assert ValidHostId(msg.sender);
                       assert ValidHostId(sender);
                       assert sender in v.hosts[observer].workingWindow.preparesRcvd[seqID];
                       assert RecordedPreparesRecvdCameFromNetwork(c, v, observer);
                       assert v.hosts[observer].workingWindow.preparesRcvd[seqID][sender] in v.network.sentMsgs;
+                      assert msg in v.network.sentMsgs;
+                      assert msg.Prepare?;
+                      assert msg.seqID == commitMsg.seqID;
+                      assert msg in prepares;
                     }
                     assert sender in bigSet by {
                       assume false;
                     }
                   }
                   Library.SubsetCardinality(smallSet, bigSet);
-                  assert |smallSet| <= |bigSet|;
                 }
                 |h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys|;
                 >= h_c.clusterConfig.AgreementQuorum();
