@@ -109,7 +109,7 @@ module Host {
   }
 
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a PrePrepare
-  predicate RecvPrePrepareEnabled(c:Constants, v:Variables, p:Message)
+  predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
     && v.viewIsActive
@@ -124,17 +124,18 @@ module Host {
   // predicate we need to reflect in our next state that we have received the PrePrepare message.
   predicate RecvPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
+    && v.WF(c)
     && msgOps.recv.Some?
     && msgOps.send.None?
     && var msg := msgOps.recv.value;
-    && RecvPrePrepareEnabled(c, v, msg)
+    && IsValidPrePrepareToAccept(c, v, msg)
     && v' == v.(workingWindow := 
                 v.workingWindow.(prePreparesRcvd := 
                                  v.workingWindow.prePreparesRcvd[msg.seqID := Some(msg)]))
   }
 
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a Prepare
-  predicate RecvPrepareEnabled(c:Constants, v:Variables, p:Message)
+  predicate IsValidPrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
     && v.viewIsActive
@@ -150,10 +151,11 @@ module Host {
   // predicate we need to reflect in our next state that we have received the Prepare message.
   predicate RecvPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
+    && v.WF(c)
     && msgOps.recv.Some?
     && msgOps.send.None?
     && var msg := msgOps.recv.value;
-    && RecvPrepareEnabled(c, v, msg)
+    && IsValidPrepareToAccept(c, v, msg)
     && v' == v.(workingWindow := 
                 v.workingWindow.(preparesRcvd := 
                                  v.workingWindow.preparesRcvd[msg.seqID := 
