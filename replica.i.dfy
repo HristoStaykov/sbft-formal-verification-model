@@ -8,7 +8,7 @@ include "network.s.dfy"
 include "cluster_config.s.dfy"
 include "messages.dfy"
 
-module Host {
+module Replica {
   import opened Library
   import opened HostIdentifiers
   import opened Messages
