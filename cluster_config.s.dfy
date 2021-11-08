@@ -15,6 +15,12 @@ module ClusterConfig {
       maxByzantineFaultyReplicas
     }
 
+    function ByzantineSafeQuorum() : nat
+      requires WF()
+    {
+      F() + 1
+    }
+
     function N() : nat  // BFT Cluster Size
       requires WF()
     {

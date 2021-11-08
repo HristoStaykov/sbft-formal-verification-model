@@ -38,6 +38,16 @@ module DistributedSystem {
     }
   }
 
+  predicate IsCommitted(c:Constants, v:Variables, view:nat, seqID:SequenceID) {
+    && v.WF(c)
+    && var ReplicasCommitted := set replicaID | && 0 <= replicaID < NumHosts()
+                                                && Replica.QuorumOfPrepares(c.replicas[replicaID],
+                                                                            v.replicas[replicaID],
+                                                                            seqID);
+    //TODO: Implement check for hasPrePrepare
+    && |ReplicasCommitted| >= c.clusterConfig.ByzantineSafeQuorum()
+  }
+
   predicate Init(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall id | ValidHostId(id) :: Replica.Init(c.replicas[id], v.replicas[id]))
