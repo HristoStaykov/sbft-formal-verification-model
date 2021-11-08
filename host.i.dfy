@@ -6,19 +6,14 @@
 
 include "network.s.dfy"
 include "cluster_config.s.dfy"
+include "messages.dfy"
 
 module Host {
   import opened Library
   import opened HostIdentifiers
+  import opened Messages
   import Network
   import ClusterConfig
-  type ClientOperation(!new, ==)
-  type SequenceID = nat
-
-  // Define your Message datatype here.
-  datatype Message = | PrePrepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | Prepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | Commit(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
                      
   type PrepareProofSet = set<Message> 
   predicate PrepareProofSetWF(ps:PrepareProofSet) {
