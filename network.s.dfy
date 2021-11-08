@@ -34,7 +34,19 @@ module Network {
   // Note that both fields are Option. A step predicate can say recv.None?
   // to indicate that it doesn't need to receive a message to occur.
   // It can say send.None? to indicate that it doesn't want to transmit a message.
-  datatype MessageOps<Message> = MessageOps(recv:Option<Message>, send:Option<Message>)
+  datatype MessageOps<Message> = MessageOps(recv:Option<Message>, send:Option<Message>) {
+    predicate IsSend()
+    {
+      && recv.None?
+      && send.Some?
+    }
+
+    predicate IsRecv()
+    {
+      && recv.Some?
+      && send.None?
+    }
+  }
 
   datatype Constants = Constants  // no constants for network
 

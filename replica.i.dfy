@@ -95,8 +95,7 @@ module Replica {
   predicate SendPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && v.WF(c)
-    && msgOps.recv.None?
-    && msgOps.send.Some?
+    && msgOps.IsSend()
     && CurrentPrimary(c, v) == c.myId
     && var msg := msgOps.send.value;
     && msg.PrePrepare? // We have a liveness bug here, we need some state that says for the client which operation ID-s we have executed
@@ -120,8 +119,7 @@ module Replica {
   predicate RecvPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && v.WF(c)
-    && msgOps.recv.Some?
-    && msgOps.send.None?
+    && msgOps.IsRecv()
     && var msg := msgOps.recv.value;
     && IsValidPrePrepareToAccept(c, v, msg)
     && v' == v.(workingWindow := 
@@ -147,8 +145,7 @@ module Replica {
   predicate RecvPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && v.WF(c)
-    && msgOps.recv.Some?
-    && msgOps.send.None?
+    && msgOps.IsRecv()
     && var msg := msgOps.recv.value;
     && IsValidPrepareToAccept(c, v, msg)
     && v' == v.(workingWindow := 
@@ -172,8 +169,7 @@ module Replica {
   predicate RecvCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
   {
     && v.WF(c)
-    && msgOps.recv.Some?
-    && msgOps.send.None?
+    && msgOps.IsRecv()
     && var msg := msgOps.recv.value;
     && IsValidCommitToAccept(c, v, msg)
     && v' == v.(workingWindow := 
@@ -185,8 +181,6 @@ module Replica {
   predicate DoCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
-    && msgOps.recv.Some?
-    && msgOps.send.None?
     // TODO: mark that a Client Operation is ready to be executed in this Replica's state.
   }
 
@@ -203,7 +197,7 @@ module Replica {
   predicate SendPrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
-    && msgOps.recv.None?
+    && msgOps.IsSend()
     && v.viewIsActive
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Prepare(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
@@ -217,7 +211,7 @@ module Replica {
   predicate SendCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
-    && msgOps.recv.None?
+    && msgOps.IsSend()
     && v.viewIsActive
     && QuorumOfPrepares(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
