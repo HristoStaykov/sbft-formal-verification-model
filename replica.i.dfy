@@ -178,11 +178,21 @@ module Replica {
                                  v.workingWindow.commitsRcvd[msg.seqID] + {msg}]))
   }
 
+  predicate QuorumOfCommits(c:Constants, v:Variables, seqID:SequenceID) {
+    && v.WF(c)
+    && |v.workingWindow.commitsRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
+  }
+
   predicate DoCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
     && QuorumOfPrepares(c, v, seqID)
-    // TODO: mark that a Client Operation is ready to be executed in this Replica's state.
+    && QuorumOfCommits(c, v, seqID)
+    && v.workingWindow.prePreparesRcvd[seqID].Some?
+    && var msg := v.workingWindow.prePreparesRcvd[seqID].value;
+    && v' == v.(workingWindow := 
+               v.workingWindow.(committedClientOperations :=
+                                 v.workingWindow.committedClientOperations[msg.seqID := Some(msg.clientOp)]))
   }
 
   predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)
