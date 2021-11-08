@@ -173,14 +173,15 @@ module Replica {
     && var msg := msgOps.recv.value;
     && IsValidCommitToAccept(c, v, msg)
     && v' == v.(workingWindow := 
-                v.workingWindow.(preparesRcvd := 
-                                 v.workingWindow.preparesRcvd[msg.seqID := 
-                                 v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
+               v.workingWindow.(commitsRcvd :=
+                                 v.workingWindow.commitsRcvd[msg.seqID :=
+                                 v.workingWindow.commitsRcvd[msg.seqID] + {msg}]))
   }
 
   predicate DoCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
+    && QuorumOfPrepares(c, v, seqID)
     // TODO: mark that a Client Operation is ready to be executed in this Replica's state.
   }
 
