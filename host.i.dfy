@@ -162,6 +162,39 @@ module Host {
                                  v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
   }
 
+  // 
+  predicate IsValidCommitToAccept(c:Constants, v:Variables, p:Message)
+  {
+    && v.WF(c)
+    && v.viewIsActive
+    && p.view == v.view
+    && p.Prepare?
+    && v.workingWindow.prePreparesRcvd[p.seqID].Some?
+    && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
+    && (forall x | x in v.workingWindow.commitsRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
+  }
+
+  predicate RecvCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && v.WF(c)
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    && var msg := msgOps.recv.value;
+    && IsValidCommitToAccept(c, v, msg)
+    && v' == v.(workingWindow := 
+                v.workingWindow.(preparesRcvd := 
+                                 v.workingWindow.preparesRcvd[msg.seqID := 
+                                 v.workingWindow.preparesRcvd[msg.seqID] + {msg}]))
+  }
+
+  predicate DoCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
+  {
+    && v.WF(c)
+    && msgOps.recv.Some?
+    && msgOps.send.None?
+    // TODO: mark that a Client Operation is ready to be executed in this Replica's state.
+  }
+
   predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)
   {
     && v.WF(c)
@@ -216,8 +249,8 @@ module Host {
     | SendPrepareStep(seqID:SequenceID)
     | RecvPrepareStep()
     | SendCommitStep(seqID:SequenceID)
-    //| RecvCommitStep()
-    //| DoCommit(seqID:SequenceID)
+    | RecvCommitStep()
+    | DoCommitStep(seqID:SequenceID)
     //| Execute(seqID:SequenceID)
     //| SendReplyToClient(seqID:SequenceID)
 
@@ -228,6 +261,8 @@ module Host {
        case SendPrepareStep(seqID) => SendPrepare(c, v, v', msgOps, seqID)
        case RecvPrepareStep => RecvPrepare(c, v, v', msgOps)
        case SendCommitStep(seqID) => SendCommit(c, v, v', msgOps, seqID)
+       case RecvCommitStep() => RecvCommit(c, v, v', msgOps)
+       case DoCommitStep(seqID) => DoCommit(c, v, v', msgOps, seqID)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
