@@ -156,6 +156,47 @@ module Proof {
       case SendPrepareStep(seqID) => { assert Inv(c, v'); }
       case RecvPrepareStep => { assert Inv(c, v'); }
       case SendCommitStep(seqID) => {
+
+        // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares
+        forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
+          QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
+          if(commitMsg in v.network.sentMsgs) {
+            // This is another example of QuorumOfPreparesInNetworkMonotonic but with a sent Commit.
+            var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
+            var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
+            Library.SubsetCardinality(senders, senders');
+            assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
+          } else {
+            //|v.workingWindow.preparesRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
+            var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
+            var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
+            assert prepares == prepares';
+            assert |setOfSendersForMsgs(prepares')| == |setOfSendersForMsgs(prepares)|;
+            assert EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v);
+            assert commitMsg == step.msgOps.send.value;
+            assert ValidHostId(commitMsg.sender);
+            
+            var bigSet := setOfSendersForMsgs(prepares);
+            var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+            forall sender | sender in smallSet
+              ensures sender in bigSet {
+              var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+              assert msg in prepares by {
+                var observer := step.id;
+                var seqID := commitMsg.seqID;
+                assert Library.TriggerKeyInFullImap(seqID, v.replicas[observer].workingWindow.preparesRcvd);
+                assert ValidHostId(msg.sender);
+                assert ValidHostId(sender);
+              }
+            }
+            Library.SubsetCardinality(smallSet, bigSet);
+            assert |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum();
+            assert |setOfSendersForMsgs(prepares')| >= c.clusterConfig.AgreementQuorum();
+            assert QuorumOfPreparesInNetwork(c, v, commitMsg.seqID);
+            assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
+          }
+        }
+
         // HonestReplicasLockOnACommitForAGiveView
         forall msg1, msg2 | 
           && msg1 in v'.network.sentMsgs 
@@ -179,59 +220,6 @@ module Proof {
               assert false;
             }
             
-          }
-          // A prove of EveryCommitMsgIsSupportedByAQuorumOfPrepares
-          forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
-            QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
-            if(commitMsg in v.network.sentMsgs) {
-              // This is another example of QuorumOfPreparesInNetworkMonotonic but with a sent Commit.
-              var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
-              var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
-              Library.SubsetCardinality(senders, senders');
-              assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
-            } else {
-              //|v.workingWindow.preparesRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
-              var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
-              var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
-              calc {
-                |setOfSendersForMsgs(prepares')|;
-                == {assume false;} |setOfSendersForMsgs(prepares)|;
-                >= { 
-                  var bigSet := setOfSendersForMsgs(prepares);
-                  var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
-                  forall sender | sender in smallSet
-                    ensures sender in bigSet {
-                    var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
-                    assert msg in prepares by {
-                      var observer := step.id;
-                      var seqID := commitMsg.seqID;
-                      assert Library.TriggerKeyInFullImap(seqID, v.replicas[observer].workingWindow.preparesRcvd);
-                      assert sender in v.replicas[observer].workingWindow.preparesRcvd[seqID];
-                      assert msg.sender == sender;
-                      assert msg in v.network.sentMsgs;
-                      assert ValidHostId(msg.sender);
-                      assert ValidHostId(sender);
-                      assert sender in v.replicas[observer].workingWindow.preparesRcvd[seqID];
-                      assert RecordedPreparesRecvdCameFromNetwork(c, v, observer);
-                      assert v.replicas[observer].workingWindow.preparesRcvd[seqID][sender] in v.network.sentMsgs;
-                      assert msg in v.network.sentMsgs;
-                      assert msg.Prepare?;
-                      assert msg.seqID == commitMsg.seqID;
-                      assert msg in prepares;
-                    }
-                    assert sender in bigSet by {
-                      assume false;
-                    }
-                  }
-                  Library.SubsetCardinality(smallSet, bigSet);
-                }
-                |h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys|;
-                >= h_c.clusterConfig.AgreementQuorum();
-                == c.clusterConfig.AgreementQuorum();
-              }
-
-              assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
-            }
           }
           assert Inv(c, v'); 
       }

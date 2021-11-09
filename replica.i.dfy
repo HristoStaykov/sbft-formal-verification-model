@@ -17,12 +17,14 @@ module Replica {
                      
   type PrepareProofSet = map<HostId, Message> 
   predicate PrepareProofSetWF(ps:PrepareProofSet) {
-      && forall x | x in ps :: ps[x].Prepare?
+      && forall x | x in ps :: && ps[x].Prepare? 
+                               && ValidHostId(ps[x].sender)
   }
 
   type CommitProofSet = set<Message>
   predicate CommitProofSetWF(cs:CommitProofSet) {
-      && forall x | x in cs :: x.Commit?
+      && forall x | x in cs :: && x.Commit?
+                               && ValidHostId(x.sender)
   }
 
   type PrePreparesRcvd = imap<SequenceID, Option<Message>>
@@ -157,6 +159,7 @@ module Replica {
   predicate IsValidCommitToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && ValidHostId(p.sender)
     && v.viewIsActive
     && p.view == v.view
     && p.Prepare?
