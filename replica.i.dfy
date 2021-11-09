@@ -185,6 +185,8 @@ module Replica {
   predicate DoCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, seqID:SequenceID)
   {
     && v.WF(c)
+    && msgOps.recv.None?
+    && msgOps.send.None?
     && QuorumOfPrepares(c, v, seqID)
     && QuorumOfCommits(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
@@ -211,6 +213,7 @@ module Replica {
     && v.viewIsActive
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Prepare(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
+    && assert msgOps.send.value.Prepare?; true
     && v' == v
   }
 
@@ -226,6 +229,7 @@ module Replica {
     && QuorumOfPrepares(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Commit(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
+    && assert msgOps.send.value.Commit?; true
     && v' == v
   }
   
