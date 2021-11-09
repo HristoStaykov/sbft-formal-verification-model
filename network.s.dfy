@@ -9,7 +9,7 @@ module HostIdentifiers {
   function NumHosts() : int
     ensures NumHosts() > 0
 
-  type HostId = int // Pretty type synonym (a la C typedef)
+  type HostId = int // Pretty type synonym (a la C typedef) //TODO move accordingly
 
   predicate ValidHostId(hostid: HostId) {
     0 <= hostid < NumHosts()

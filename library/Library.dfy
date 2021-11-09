@@ -63,4 +63,33 @@ module Library {
     m'
   }
 
+
+  lemma SubsetCardinality<T>(a:set<T>, b:set<T>)
+    requires a <= b
+    ensures |a| <= |b|
+  {
+    var diff := b - a;
+    assert b == a + diff;
+    assert |b| == |a| + |diff|;
+  }
+
+  predicate FullImap<K(!new),V>(im:imap<K,V>) {
+    forall k :: k in im
+  }
+
+  // Warning: Dafny automation black magic.
+  // Everything is in a FullImap! But sometimes Dafny seems unable
+  // to trigger that forall. (jonh suspects the issue is related to
+  // the map being a deeply-nested expression, since Dafny gets the
+  // proof no problem here where the map is a top-level object.)
+  // So this predicate does "nothing" logically (it's just 'true'),
+  // but has the 'ensures' side-effect of pointing out the 'in' expression
+  // we need.
+  predicate TriggerKeyInFullImap<K(!new),V>(k:K, m:imap<K,V>) 
+    requires FullImap(m)
+    ensures k in m
+  {
+    true
+  }
+
 }
