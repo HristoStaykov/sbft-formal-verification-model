@@ -21,11 +21,11 @@ module Proof {
   // Here's a predicate that will be very useful in constructing inviariant conjuncts.
   predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
-    && (forall hostIdx, seqID | 
-              && ValidHostId(hostIdx)
-              && assert Library.TriggerKeyInFullImap(seqID, v.replicas[hostIdx].workingWindow.prePreparesRcvd);
-                v.replicas[hostIdx].workingWindow.prePreparesRcvd[seqID].Some? 
-                :: v.replicas[hostIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
+    && (forall replicaIdx, seqID | 
+              && ValidHostId(replicaIdx)
+              && assert Library.TriggerKeyInFullImap(seqID, v.replicas[replicaIdx].workingWindow.prePreparesRcvd);
+                v.replicas[replicaIdx].workingWindow.prePreparesRcvd[seqID].Some? 
+                :: v.replicas[replicaIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
   }
 
   predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId) {
