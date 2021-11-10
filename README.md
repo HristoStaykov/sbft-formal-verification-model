@@ -58,13 +58,13 @@ editor if you prefer.
 From the container started as described in the previous step run:
 
 ```bash
-dafny host.i.dfy
+dafny proof.dfy
 ```
 
 If everything is working, you should see something like:
 
 ```bash
-Dafny program verifier finished with 15 verified, 0 errors
+Dafny program verifier finished with 10 verified, 0 errors
 ```
 
 # Acknowledgements and references
