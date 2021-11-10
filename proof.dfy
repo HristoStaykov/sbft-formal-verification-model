@@ -124,23 +124,24 @@ module Proof {
     forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
       QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
       if(commitMsg in v.network.sentMsgs) {
-        // This is another example of QuorumOfPreparesInNetworkMonotonic but with a sent Commit.
+        // Adding some basic facts to help Dafny - otherwise this is trivial
         var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
         var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
         Library.SubsetCardinality(senders, senders');
       } else {
         var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
         var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
-        assert prepares == prepares'; //Observe
+        assert prepares == prepares'; // Trigger (hint)
         
-        var bigSet := setOfSendersForMsgs(prepares);
+        var prepareSendersFromNetwork := setOfSendersForMsgs(prepares);
         var h_v := v.replicas[step.id];
-        var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
-        assert (forall sender | sender in smallSet 
+        var prepareSendersInWorkingWindow := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+        assert (forall sender | sender in prepareSendersInWorkingWindow 
                               :: && var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
                                  && msg in v.network.sentMsgs);
-        assert (forall sender | sender in smallSet :: sender in bigSet); //Trigger for subset operator
-        Library.SubsetCardinality(smallSet, bigSet);
+        assert (forall sender | sender in prepareSendersInWorkingWindow 
+                              :: sender in prepareSendersFromNetwork); //Trigger for subset operator
+        Library.SubsetCardinality(prepareSendersInWorkingWindow, prepareSendersFromNetwork);
       }
     }
   }
