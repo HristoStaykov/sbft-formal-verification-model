@@ -22,7 +22,6 @@ module Proof {
   predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID | 
-              //&& ValidHostId(replicaIdx)
               && c.IsReplica(replicaIdx)
               && assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd);
                 v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some? 
@@ -32,7 +31,6 @@ module Proof {
   predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId)
   {
     && v.WF(c)
-    //&& ValidHostId(observer)
     && c.IsReplica(observer)
     && (forall sender, seqID | 
               && assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].replicaVariables.workingWindow.preparesRcvd);
@@ -46,7 +44,6 @@ module Proof {
   predicate RecordedPreparesInAllHostsRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall observer | 
-            //&& ValidHostId(observer)
             && c.IsReplica(observer)
                 :: RecordedPreparesRecvdCameFromNetwork(c, v, observer))
   }
@@ -158,22 +155,23 @@ module Proof {
   {
     var step :| NextStep(c, v, v', step);
 
+    ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
+
     if (c.IsReplica(step.id))
     {
       var h_c := c.hosts[step.id].replicaConstants;
       var h_v := v.hosts[step.id].replicaVariables;
       var h_v' := v'.hosts[step.id].replicaVariables;
       var h_step :| Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
-      QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step);
+      
+      //QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step); // not part of the proof yet
+      
       match h_step
         case SendPrePrepareStep() => { assert Inv(c, v'); }
         case RecvPrePrepareStep => { assert Inv(c, v'); }
         case SendPrepareStep(seqID) => { assert Inv(c, v'); }
         case RecvPrepareStep => { assert Inv(c, v'); }
-        case SendCommitStep(seqID) => {
-          ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
-          assert Inv(c, v'); 
-        }
+        case SendCommitStep(seqID) => { assert Inv(c, v'); }
         case RecvCommitStep() => { assert Inv(c, v'); }
         case DoCommitStep(seqID) => { assert Inv(c, v'); }
     } else if (c.IsClient(step.id)) {
@@ -184,13 +182,10 @@ module Proof {
       var h_step :| Client.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
 
       match h_step
-        case SendClientOperationStep() => { 
-          ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
-          assert Inv(c, v');  
-        }
+        case SendClientOperationStep() => { assert Inv(c, v'); }
 
     } else {
-      assert Inv(c, v');
+      assert false; // Should not be possible
     }
   }
 

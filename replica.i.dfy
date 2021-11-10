@@ -89,22 +89,6 @@ module Replica {
     v.view % c.clusterConfig.N()
   }
 
-    // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrePrepare
-  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages. In this 
-  // predicate we need to reflect in our next state that we have received the PrePrepare message.
-  predicate RecvClientOperation(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
-  {
-    && v.WF(c)
-    && msgOps.IsRecv()
-    && var msg := msgOps.recv.value;
-    //&& IsValidPrePrepareToAccept(c, v, msg)
-    && msg.ClientRequest?
-    // && v' == v.(workingWindow := 
-    //             v.workingWindow.(prePreparesRcvd := 
-    //                              v.workingWindow.prePreparesRcvd[msg.seqID := Some(msg)]))
-    // Last Reply logic
-  }
-
   // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
   // Action is taken. We use the "binding" variable msgOps through which we send/recv messages.
   predicate SendPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
