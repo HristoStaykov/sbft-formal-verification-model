@@ -69,7 +69,7 @@ module Proof {
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
     && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
-    && HonestReplicasLockOnCommitForGivenView(c, v)
+    //&& HonestReplicasLockOnCommitForGivenView(c, v)
   }
 
   function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID) : set<Messages.Message> 
@@ -89,30 +89,6 @@ module Proof {
     && var prepares := getAllPreparesForSeqID(c, v, seqID);
     && |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum()
     //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
-  }
-
-  lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step,
-                            old_msg:Messages.Message, new_msg:Messages.Message)
-    requires NextStep(c, v, v', step)
-    requires  var h_c := c.replicas[step.id];
-              var h_v := v.replicas[step.id];
-              var h_v' := v'.replicas[step.id];
-              && Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
-              && h_step.SendCommitStep?
-              && Replica.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
-    requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs
-    requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs
-    requires && old_msg.seqID == new_msg.seqID
-             && old_msg.sender == new_msg.sender
-             && old_msg.Commit?
-             && new_msg.Commit?
-
-    requires Inv(c, v)
-    ensures old_msg == new_msg
-  {
-    assert QuorumOfPreparesInNetwork(c, v, h_step.seqID);
-    assert QuorumOfPreparesInNetwork(c, v', h_step.seqID);
-    assert old_msg == new_msg;
   }
 
   predicate NoNewCommits(c: Constants, v:Variables, v':Variables)
@@ -179,32 +155,7 @@ module Proof {
             Library.SubsetCardinality(smallSet, bigSet);
           }
         }
-
-        // HonestReplicasLockOnACommitForAGiveView
-        forall msg1, msg2 | 
-          && msg1 in v'.network.sentMsgs 
-          && msg2 in v'.network.sentMsgs 
-          && msg1.seqID == msg2.seqID
-          && msg1.sender == msg2.sender
-          && msg1.Commit?
-          && msg2.Commit?
-          ensures msg1 == msg2 {
-            if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-              assert msg1 == msg2;
-            } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-              assert msg1 == msg2;
-            } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-              WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
-              assert msg1 == msg2;
-            } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-              WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
-              assert msg1 == msg2;
-            } else {
-              assert false;
-            }
-            
-          }
-          assert Inv(c, v'); 
+        assert Inv(c, v'); 
       }
       case RecvCommitStep() => { assert Inv(c, v'); }
       case DoCommitStep(seqID) => { assert Inv(c, v'); }
