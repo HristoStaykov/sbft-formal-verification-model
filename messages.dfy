@@ -11,7 +11,7 @@ module Messages {
   datatype Message = | PrePrepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
                      | Prepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
                      | Commit(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | ClientRequest(clientOp:ClientOperation)
+                     | ClientRequest(sender:HostId, clientOp:ClientOperation)
 
   // ToDo: ClientReply
 }
