@@ -115,6 +115,36 @@ module Proof {
     }
   }
 
+  lemma ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c: Constants, v:Variables, v':Variables, step:Step)
+    requires Inv(c, v)
+    requires NextStep(c, v, v', step)
+    ensures EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v')
+  {
+    // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares
+    forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
+      QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
+      if(commitMsg in v.network.sentMsgs) {
+        // This is another example of QuorumOfPreparesInNetworkMonotonic but with a sent Commit.
+        var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
+        var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
+        Library.SubsetCardinality(senders, senders');
+      } else {
+        var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
+        var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
+        assert prepares == prepares'; //Observe
+        
+        var bigSet := setOfSendersForMsgs(prepares);
+        var h_v := v.replicas[step.id];
+        var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+        assert (forall sender | sender in smallSet 
+                              :: && var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+                                 && msg in v.network.sentMsgs);
+        assert (forall sender | sender in smallSet :: sender in bigSet); //Trigger for subset operator
+        Library.SubsetCardinality(smallSet, bigSet);
+      }
+    }
+  }
+
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
@@ -132,29 +162,7 @@ module Proof {
       case SendPrepareStep(seqID) => { assert Inv(c, v'); }
       case RecvPrepareStep => { assert Inv(c, v'); }
       case SendCommitStep(seqID) => {
-
-        // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares
-        forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
-          QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
-          if(commitMsg in v.network.sentMsgs) {
-            // This is another example of QuorumOfPreparesInNetworkMonotonic but with a sent Commit.
-            var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
-            var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
-            Library.SubsetCardinality(senders, senders');
-          } else {
-            var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
-            var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
-            assert prepares == prepares'; //Observe
-            
-            var bigSet := setOfSendersForMsgs(prepares);
-            var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
-            assert (forall sender | sender in smallSet 
-                                  :: && var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
-                                     && msg in v.network.sentMsgs);
-            assert (forall sender | sender in smallSet :: sender in bigSet); //Trigger for subset operator
-            Library.SubsetCardinality(smallSet, bigSet);
-          }
-        }
+        ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
         assert Inv(c, v'); 
       }
       case RecvCommitStep() => { assert Inv(c, v'); }
