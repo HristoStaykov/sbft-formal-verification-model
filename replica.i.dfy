@@ -121,9 +121,9 @@ module Replica {
   predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && p.PrePrepare?
     && ValidHostId(p.sender)
     && v.viewIsActive
-    && p.PrePrepare?
     && p.view == v.view
     && p.sender == CurrentPrimary(c, v)
     && v.workingWindow.prePreparesRcvd[p.seqID].None?
@@ -147,9 +147,9 @@ module Replica {
   predicate IsValidPrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && p.Prepare?
     && ValidHostId(p.sender)
     && v.viewIsActive
-    && p.Prepare?
     && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
@@ -175,9 +175,9 @@ module Replica {
   predicate IsValidCommitToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && p.Prepare?
     && ValidHostId(p.sender)
     && v.viewIsActive
-    && p.Prepare?
     && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
@@ -265,7 +265,7 @@ module Replica {
 
   // JayNF
   datatype Step =
-    | RecvClientOperation()
+    //| RecvClientOperation()
     | SendPrePrepareStep()
     | RecvPrePrepareStep()
     | SendPrepareStep(seqID:SequenceID)
@@ -278,7 +278,6 @@ module Replica {
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
-       case RecvClientOperation() => RecvClientOperation(c, v, v', msgOps)
        case SendPrePrepareStep() => SendPrePrepare(c, v, v', msgOps)
        case RecvPrePrepareStep => RecvPrePrepare(c, v, v', msgOps)
        case SendPrepareStep(seqID) => SendPrepare(c, v, v', msgOps, seqID)

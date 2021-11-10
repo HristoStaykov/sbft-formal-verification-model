@@ -55,12 +55,9 @@ module DistributedSystem {
     
     predicate WF(c: Constants) {
       && c.WF()
-      && |replicas| == |c.replicas|
-      //TODO: check valid host/replica
-      && (forall replicaIdx | ValidHostId(replicaIdx) :: replicas[replicaIdx].WF(c.replicas[replicaIdx]))
       && |hosts| == |c.hosts|
-      && (forall id | c.IsReplica(id) :: hosts[id].Replica?)
-      && (forall id | c.IsClient(id) :: hosts[id].Client?)
+      && (forall id | c.IsReplica(id) :: hosts[id].Replica? && hosts[id].replicaVariables.WF(c.hosts[id].replicaConstants))
+      && (forall id | c.IsClient(id) :: hosts[id].Client? && hosts[id].clientVariables.WF(c.hosts[id].clientConstants))
     }
   }
 
