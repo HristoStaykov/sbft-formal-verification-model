@@ -1,12 +1,20 @@
 module ClusterConfig {
 
   datatype Constants = Constants(
-    maxByzantineFaultyReplicas:nat
+    maxByzantineFaultyReplicas:nat,
+    numClients:nat
   ) {
 
     predicate WF()
     {
-      maxByzantineFaultyReplicas > 0 // Require non-trivial BFT system
+      && maxByzantineFaultyReplicas > 0 // Require non-trivial BFT system
+      && numClients > 0
+    }
+
+    function ClusterSize() : nat
+      requires WF()
+    {
+      N() + numClients
     }
 
     function F() : nat
@@ -21,7 +29,7 @@ module ClusterConfig {
       F() + 1
     }
 
-    function N() : nat  // BFT Cluster Size
+    function N() : nat  // BFT Replica Size
       requires WF()
     {
       3 * F() + 1

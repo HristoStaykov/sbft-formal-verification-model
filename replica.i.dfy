@@ -89,6 +89,22 @@ module Replica {
     v.view % c.clusterConfig.N()
   }
 
+    // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrePrepare
+  // Action is taken. We use the "binding" variable msgOps through which we send/recv messages. In this 
+  // predicate we need to reflect in our next state that we have received the PrePrepare message.
+  predicate RecvClientOperation(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && v.WF(c)
+    && msgOps.IsRecv()
+    && var msg := msgOps.recv.value;
+    //&& IsValidPrePrepareToAccept(c, v, msg)
+    && msg.ClientRequest?
+    // && v' == v.(workingWindow := 
+    //             v.workingWindow.(prePreparesRcvd := 
+    //                              v.workingWindow.prePreparesRcvd[msg.seqID := Some(msg)]))
+    // Last Reply logic
+  }
+
   // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
   // Action is taken. We use the "binding" variable msgOps through which we send/recv messages.
   predicate SendPrePrepare(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
@@ -107,8 +123,8 @@ module Replica {
     && v.WF(c)
     && ValidHostId(p.sender)
     && v.viewIsActive
-    && p.view == v.view
     && p.PrePrepare?
+    && p.view == v.view
     && p.sender == CurrentPrimary(c, v)
     && v.workingWindow.prePreparesRcvd[p.seqID].None?
   }
@@ -133,8 +149,8 @@ module Replica {
     && v.WF(c)
     && ValidHostId(p.sender)
     && v.viewIsActive
-    && p.view == v.view
     && p.Prepare?
+    && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
     && p.sender !in v.workingWindow.preparesRcvd[p.seqID] // We stick to the first vote from a peer.
@@ -161,8 +177,8 @@ module Replica {
     && v.WF(c)
     && ValidHostId(p.sender)
     && v.viewIsActive
-    && p.view == v.view
     && p.Prepare?
+    && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
     && (forall x | x in v.workingWindow.commitsRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
@@ -249,7 +265,7 @@ module Replica {
 
   // JayNF
   datatype Step =
-    //| RecvClientOperation()
+    | RecvClientOperation()
     | SendPrePrepareStep()
     | RecvPrePrepareStep()
     | SendPrepareStep(seqID:SequenceID)
@@ -262,6 +278,7 @@ module Replica {
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
+       case RecvClientOperation() => RecvClientOperation(c, v, v', msgOps)
        case SendPrePrepareStep() => SendPrePrepare(c, v, v', msgOps)
        case RecvPrePrepareStep => RecvPrePrepare(c, v, v', msgOps)
        case SendPrepareStep(seqID) => SendPrepare(c, v, v', msgOps, seqID)

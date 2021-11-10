@@ -3,9 +3,9 @@
 //#desc with one another over the network.
 
 include "replica.i.dfy"
+include "client.i.dfy"
 include "cluster_config.s.dfy"
 include "messages.dfy"
-
 
 // Before we get here, caller must define a type Message that we'll
 // use to instantiate network.s.dfy.
@@ -15,36 +15,60 @@ module DistributedSystem {
   import opened Messages
   import ClusterConfig
   import Replica
+  import Client
   import Network
 
+  datatype HostConstants = Replica(replicaConstants:Replica.Constants) | Client(clientConstants:Client.Constants)
+  datatype HostVariables = Replica(replicaVariables:Replica.Variables) | Client(clientVariables:Client.Variables)
+
   datatype Constants = Constants(
-    replicas:seq<Replica.Constants>,
+    hosts:seq<HostConstants>,
     network:Network.Constants,
     clusterConfig:ClusterConfig.Constants) {
+    
     predicate WF() {
       && clusterConfig.WF()
-      && |replicas| == NumHosts()
-      && clusterConfig.N() == NumHosts()
-      && (forall id | ValidHostId(id) :: replicas[id].Configure(id, clusterConfig))  // every host knows its id (and ids are unique)
+      && clusterConfig.ClusterSize() == NumHosts()
+      && |hosts| == NumHosts()
+      && (forall id | IsReplica(id) :: hosts[id] == HostConstants.Replica(Replica.Constants(id, clusterConfig)))
+      && (forall id | IsClient(id) :: hosts[id] == HostConstants.Client(Client.Constants(id, clusterConfig)))
+    }
+
+    predicate IsReplica(id:HostId)
+      requires clusterConfig.WF()
+    {
+      && ValidHostId(id)
+      && 0 <= id < clusterConfig.N()
+    }
+
+    predicate IsClient(id:HostId)
+      requires clusterConfig.WF()
+    {
+      && ValidHostId(id)
+      && clusterConfig.N() <= id < NumHosts()
     }
   }
 
   datatype Variables = Variables(
-    replicas:seq<Replica.Variables>,
+    hosts:seq<HostVariables>,
     network:Network.Variables<Message>) {
+    
     predicate WF(c: Constants) {
       && c.WF()
       && |replicas| == |c.replicas|
       //TODO: check valid host/replica
       && (forall replicaIdx | ValidHostId(replicaIdx) :: replicas[replicaIdx].WF(c.replicas[replicaIdx]))
+      && |hosts| == |c.hosts|
+      && (forall id | c.IsReplica(id) :: hosts[id].Replica?)
+      && (forall id | c.IsClient(id) :: hosts[id].Client?)
     }
   }
 
   predicate IsCommitted(c:Constants, v:Variables, view:nat, seqID:SequenceID) {
     && v.WF(c)
-    && var ReplicasCommitted := set replicaID | && 0 <= replicaID < NumHosts()
-                                                && Replica.QuorumOfPrepares(c.replicas[replicaID],
-                                                                            v.replicas[replicaID],
+    && var ReplicasCommitted := set replicaID | && 0 <= replicaID < c.clusterConfig.N()
+                                                && Replica.QuorumOfPrepares(c.hosts[replicaID].replicaConstants,
+                                                                            v.hosts[replicaID].replicaVariables,
                                                                             seqID);
     //TODO: Implement check for hasPrePrepare
     && |ReplicasCommitted| >= c.clusterConfig.ByzantineSafeQuorum()
@@ -52,19 +76,35 @@ module DistributedSystem {
 
   predicate Init(c:Constants, v:Variables) {
     && v.WF(c)
-    && (forall id | ValidHostId(id) :: Replica.Init(c.replicas[id], v.replicas[id]))
+    && (forall id | && c.IsReplica(id) 
+                    :: Replica.Init(c.hosts[id].replicaConstants, v.hosts[id].replicaVariables))
+    && (forall id | && c.IsClient(id)
+                    :: Client.Init(c.hosts[id].clientConstants, v.hosts[id].clientVariables))
     && Network.Init(c.network, v.network)
   }
 
   // JayNF
   datatype Step = Step(id:HostId, msgOps: Network.MessageOps<Message>)
 
+  predicate ReplicaStep(c:Constants, v:Variables, v':Variables, step: Step) {
+      && v.WF(c)
+      && v'.WF(c)
+      && c.IsReplica(step.id)
+      && Replica.Next(c.hosts[step.id].replicaConstants, v.hosts[step.id].replicaVariables, v'.hosts[step.id].replicaVariables, step.msgOps)
+  }
+
+  predicate ClientStep(c:Constants, v:Variables, v':Variables, step: Step) {
+      && v.WF(c)
+      && v'.WF(c)
+      && c.IsClient(step.id)
+      && Client.Next(c.hosts[step.id].clientConstants, v.hosts[step.id].clientVariables, v'.hosts[step.id].clientVariables, step.msgOps)
+  }
+
   predicate NextStep(c:Constants, v:Variables, v':Variables, step: Step) {
     && v.WF(c)
     && v'.WF(c)
-    && ValidHostId(step.id)
-    && Replica.Next(c.replicas[step.id], v.replicas[step.id], v'.replicas[step.id], step.msgOps)
-    && (forall other | ValidHostId(other) && other != step.id :: v'.replicas[other] == v.replicas[other])
+    && (ReplicaStep(c,v,v',step) || ClientStep(c,v,v',step))
+    && (forall other | ValidHostId(other) && other != step.id :: v'.hosts[other] == v.hosts[other])
     && Network.Next(c.network, v.network, v'.network, step.msgOps)
   }
 
