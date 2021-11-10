@@ -165,35 +165,18 @@ module Proof {
             var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
             var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
             Library.SubsetCardinality(senders, senders');
-            assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
           } else {
-            //|v.workingWindow.preparesRcvd[seqID]| >= c.clusterConfig.AgreementQuorum()
             var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
             var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
-            assert prepares == prepares';
-            assert |setOfSendersForMsgs(prepares')| == |setOfSendersForMsgs(prepares)|;
-            assert EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v);
-            assert commitMsg == step.msgOps.send.value;
-            assert ValidHostId(commitMsg.sender);
+            assert prepares == prepares'; //Observe
             
             var bigSet := setOfSendersForMsgs(prepares);
             var smallSet := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
-            forall sender | sender in smallSet
-              ensures sender in bigSet {
-              var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
-              assert msg in prepares by {
-                var observer := step.id;
-                var seqID := commitMsg.seqID;
-                assert Library.TriggerKeyInFullImap(seqID, v.replicas[observer].workingWindow.preparesRcvd);
-                assert ValidHostId(msg.sender);
-                assert ValidHostId(sender);
-              }
-            }
+            assert (forall sender | sender in smallSet 
+                                  :: && var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+                                     && msg in v.network.sentMsgs);
+            assert (forall sender | sender in smallSet :: sender in bigSet); //Trigger for subset operator
             Library.SubsetCardinality(smallSet, bigSet);
-            assert |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum();
-            assert |setOfSendersForMsgs(prepares')| >= c.clusterConfig.AgreementQuorum();
-            assert QuorumOfPreparesInNetwork(c, v, commitMsg.seqID);
-            assert QuorumOfPreparesInNetwork(c, v', commitMsg.seqID);
           }
         }
 
