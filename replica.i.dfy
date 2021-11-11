@@ -105,10 +105,10 @@ module Replica {
   predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && p.PrePrepare?
     && ValidHostId(p.sender)
     && v.viewIsActive
     && p.view == v.view
-    && p.PrePrepare?
     && p.sender == CurrentPrimary(c, v)
     && v.workingWindow.prePreparesRcvd[p.seqID].None?
   }
@@ -131,10 +131,10 @@ module Replica {
   predicate IsValidPrepareToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && p.Prepare?
     && ValidHostId(p.sender)
     && v.viewIsActive
     && p.view == v.view
-    && p.Prepare?
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
     && p.sender !in v.workingWindow.preparesRcvd[p.seqID] // We stick to the first vote from a peer.
@@ -159,10 +159,10 @@ module Replica {
   predicate IsValidCommitToAccept(c:Constants, v:Variables, p:Message)
   {
     && v.WF(c)
+    && p.Prepare?
     && ValidHostId(p.sender)
     && v.viewIsActive
     && p.view == v.view
-    && p.Prepare?
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
     && (forall x | x in v.workingWindow.commitsRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)

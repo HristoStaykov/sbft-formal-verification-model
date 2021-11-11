@@ -22,19 +22,20 @@ module Proof {
   predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID | 
-              && ValidHostId(replicaIdx)
-              && assert Library.TriggerKeyInFullImap(seqID, v.replicas[replicaIdx].workingWindow.prePreparesRcvd);
-                v.replicas[replicaIdx].workingWindow.prePreparesRcvd[seqID].Some? 
-                :: v.replicas[replicaIdx].workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
+              && c.IsReplica(replicaIdx)
+              && assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd);
+                v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some? 
+                :: v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
   }
 
-  predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId) {
+  predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId)
+  {
     && v.WF(c)
-    && ValidHostId(observer)
+    && c.IsReplica(observer)
     && (forall sender, seqID | 
-              && assert Library.TriggerKeyInFullImap(seqID, v.replicas[observer].workingWindow.preparesRcvd);
-                sender in v.replicas[observer].workingWindow.preparesRcvd[seqID]
-                :: (&& var msg := v.replicas[observer].workingWindow.preparesRcvd[seqID][sender];
+              && assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].replicaVariables.workingWindow.preparesRcvd);
+                sender in v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID]
+                :: (&& var msg := v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID][sender];
                     && msg in v.network.sentMsgs
                     && msg.sender == sender
                     && msg.seqID == seqID)) // The key we stored matches what is in the msg
@@ -43,7 +44,7 @@ module Proof {
   predicate RecordedPreparesInAllHostsRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall observer | 
-            && ValidHostId(observer)
+            && c.IsReplica(observer)
                 :: RecordedPreparesRecvdCameFromNetwork(c, v, observer))
   }
 
@@ -57,10 +58,10 @@ module Proof {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
-        && msg1.seqID == msg2.seqID
-        && msg1.sender == msg2.sender
         && msg1.Commit?
         && msg2.Commit?
+        && msg1.seqID == msg2.seqID
+        && msg1.sender == msg2.sender
         :: msg1 == msg2)
   }
 
@@ -98,9 +99,10 @@ module Proof {
 
   lemma QuorumOfPreparesInNetworkMonotonic(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step)
     requires NextStep(c, v, v', step)
-    requires var h_c := c.replicas[step.id];
-             var h_v := v.replicas[step.id];
-             var h_v' := v'.replicas[step.id];
+    requires c.IsReplica(step.id)
+    requires var h_c := c.hosts[step.id].replicaConstants;
+             var h_v := v.hosts[step.id].replicaVariables;
+             var h_v' := v'.hosts[step.id].replicaVariables;
              Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
     ensures NoNewCommits(c, v, v')
              ==> (forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
@@ -134,10 +136,10 @@ module Proof {
         assert prepares == prepares'; // Trigger (hint)
         
         var prepareSendersFromNetwork := setOfSendersForMsgs(prepares);
-        var h_v := v.replicas[step.id];
-        var prepareSendersInWorkingWindow := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+        var h_v := v.hosts[step.id];
+        var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
         assert (forall sender | sender in prepareSendersInWorkingWindow 
-                              :: && var msg := h_v.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+                              :: && var msg := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID][sender];
                                  && msg in v.network.sentMsgs);
         assert (forall sender | sender in prepareSendersInWorkingWindow 
                               :: sender in prepareSendersFromNetwork); //Trigger for subset operator
@@ -152,23 +154,39 @@ module Proof {
     ensures Inv(c, v')
   {
     var step :| NextStep(c, v, v', step);
-    var h_c := c.replicas[step.id];
-    var h_v := v.replicas[step.id];
-    var h_v' := v'.replicas[step.id];
-    var h_step :| Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
-    QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step);
-    match h_step
-      case SendPrePrepareStep() => { assert Inv(c, v'); }
-      case RecvPrePrepareStep => { assert Inv(c, v'); }
-      case SendPrepareStep(seqID) => { assert Inv(c, v'); }
-      case RecvPrepareStep => { assert Inv(c, v'); }
-      case SendCommitStep(seqID) => {
-        ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
-        assert Inv(c, v'); 
-      }
-      case RecvCommitStep() => { assert Inv(c, v'); }
-      case DoCommitStep(seqID) => { assert Inv(c, v'); }
 
+    ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
+
+    if (c.IsReplica(step.id))
+    {
+      var h_c := c.hosts[step.id].replicaConstants;
+      var h_v := v.hosts[step.id].replicaVariables;
+      var h_v' := v'.hosts[step.id].replicaVariables;
+      var h_step :| Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
+      
+      //QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step); // not part of the proof yet
+      
+      match h_step
+        case SendPrePrepareStep() => { assert Inv(c, v'); }
+        case RecvPrePrepareStep => { assert Inv(c, v'); }
+        case SendPrepareStep(seqID) => { assert Inv(c, v'); }
+        case RecvPrepareStep => { assert Inv(c, v'); }
+        case SendCommitStep(seqID) => { assert Inv(c, v'); }
+        case RecvCommitStep() => { assert Inv(c, v'); }
+        case DoCommitStep(seqID) => { assert Inv(c, v'); }
+    } else if (c.IsClient(step.id)) {
+
+      var h_c := c.hosts[step.id].clientConstants;
+      var h_v := v.hosts[step.id].clientVariables;
+      var h_v' := v'.hosts[step.id].clientVariables;
+      var h_step :| Client.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
+
+      match h_step
+        case SendClientOperationStep() => { assert Inv(c, v'); }
+
+    } else {
+      assert false; // Should not be possible
+    }
   }
 
   lemma InvariantInductive(c: Constants, v:Variables, v':Variables)
