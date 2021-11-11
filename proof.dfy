@@ -51,7 +51,7 @@ module Proof {
   predicate EveryCommitMsgIsSupportedByAQuorumOfPrepares(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | commitMsg in v.network.sentMsgs && commitMsg.Commit? ::
-          QuorumOfPreparesInNetwork(c, v, commitMsg.seqID) )
+          QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
   }
 
   predicate HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
@@ -73,11 +73,13 @@ module Proof {
     //&& HonestReplicasLockOnCommitForGivenView(c, v)
   }
 
-  function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID) : set<Messages.Message> 
+  function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID,
+                                  clientOp:Messages.ClientOperation) : set<Messages.Message> 
   {
     set msg | && msg in v.network.sentMsgs 
               && msg.Prepare?
               && msg.seqID == seqID
+              && msg.clientOp == clientOp
   }
 
   function setOfSendersForMsgs(msgs:set<Messages.Message>) : set<HostIdentifiers.HostId> {
@@ -85,9 +87,10 @@ module Proof {
     set msg | msg in msgs :: msg.sender
   }
 
-  predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, seqID:Messages.SequenceID) {
+  predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, seqID:Messages.SequenceID, 
+                                      clientOp:Messages.ClientOperation) {
     && v.WF(c)
-    && var prepares := getAllPreparesForSeqID(c, v, seqID);
+    && var prepares := getAllPreparesForSeqID(c, v, seqID, clientOp);
     && |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum()
     //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
   }
@@ -104,14 +107,14 @@ module Proof {
              var h_v := v.hosts[step.id].replicaVariables;
              var h_v' := v'.hosts[step.id].replicaVariables;
              Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
-    ensures (forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
-                                        :: QuorumOfPreparesInNetwork(c, v', seqID))
+    ensures (forall seqID, clientOp | QuorumOfPreparesInNetwork(c, v, seqID, clientOp)
+                                        :: QuorumOfPreparesInNetwork(c, v', seqID, clientOp))
   {
-    forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
-                                  ensures QuorumOfPreparesInNetwork(c, v', seqID)
+    forall seqID, clientOp | QuorumOfPreparesInNetwork(c, v, seqID, clientOp)
+                                  ensures QuorumOfPreparesInNetwork(c, v', seqID, clientOp)
     {
-      var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, seqID));
-      var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', seqID));
+      var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, seqID, clientOp));
+      var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', seqID, clientOp));
       Library.SubsetCardinality(senders, senders');
     }
   }
@@ -123,15 +126,15 @@ module Proof {
   {
     // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares
     forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
-      QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
+      QuorumOfPreparesInNetwork(c, v', commitMsg.seqID, commitMsg.clientOp) {
       if(commitMsg in v.network.sentMsgs) {
         // Adding some basic facts to help Dafny - otherwise this is trivial
-        var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
-        var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
+        var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID, commitMsg.clientOp));
+        var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID, commitMsg.clientOp));
         Library.SubsetCardinality(senders, senders');
       } else {
-        var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
-        var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
+        var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID, commitMsg.clientOp);
+        var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID, commitMsg.clientOp);
         assert prepares == prepares'; // Trigger (hint)
         
         var prepareSendersFromNetwork := setOfSendersForMsgs(prepares);
