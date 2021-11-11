@@ -121,19 +121,21 @@ module Proof {
     requires NextStep(c, v, v', step)
     ensures EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v')
   {
-    // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares
+    // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares,
+    // by selecting an arbitrary commitMsg instance
     forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
       QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
-      if(commitMsg in v.network.sentMsgs) {
-        // Adding some basic facts to help Dafny - otherwise this is trivial
+      if(commitMsg in v.network.sentMsgs) { // the commitMsg has been sent in a previous step
+        // In this case, the proof is trivial - we just need to "teach" Dafny about subset cardinality
         var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
         var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
         Library.SubsetCardinality(senders, senders');
-      } else {
+      } else { // the commitMsg is being sent in the current step
         var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
         var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
-        assert prepares == prepares'; // Trigger (hint)
+        assert prepares == prepares'; // Trigger (hint) - sending a commitMsg does not affect the set of prepares
         
+        // Prove that the prepares in the working window are a subset of the prepares in the network:
         var prepareSendersFromNetwork := setOfSendersForMsgs(prepares);
         var h_v := v.hosts[step.id];
         var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
