@@ -104,8 +104,7 @@ module Proof {
              var h_v := v.hosts[step.id].replicaVariables;
              var h_v' := v'.hosts[step.id].replicaVariables;
              Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
-    ensures NoNewCommits(c, v, v')
-             ==> (forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
+    ensures (forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
                                         :: QuorumOfPreparesInNetwork(c, v', seqID))
   {
     forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
