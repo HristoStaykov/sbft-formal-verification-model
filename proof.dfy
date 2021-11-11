@@ -65,12 +65,24 @@ module Proof {
         :: msg1 == msg2)
   }
 
+  predicate RecordedPreparesClientOpsMatchPrePrepare(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall replicaIdx, seqID, sender |
+          && c.IsReplica(replicaIdx)
+          && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
+          && seqID in prepareMap
+          && sender in prepareMap[seqID]
+          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some?         
+             && v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd[seqID][sender].clientOp 
+             == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
+  }
 
   predicate Inv(c: Constants, v:Variables) {
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
     && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
-    //&& HonestReplicasLockOnCommitForGivenView(c, v)
+    && RecordedPreparesClientOpsMatchPrePrepare(c, v)
+    && HonestReplicasLockOnCommitForGivenView(c, v)
   }
 
   function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID,
@@ -143,11 +155,87 @@ module Proof {
         assert (forall sender | sender in prepareSendersInWorkingWindow 
                               :: && var msg := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID][sender];
                                  && msg in v.network.sentMsgs);
-        assert (forall sender | sender in prepareSendersInWorkingWindow 
-                              :: sender in prepareSendersFromNetwork); //Trigger for subset operator
+        forall sender | sender in prepareSendersInWorkingWindow 
+                              ensures sender in prepareSendersFromNetwork {
+          var msg := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+          assert msg in v.network.sentMsgs;
+          assert msg.seqID == commitMsg.seqID;
+          assert msg.clientOp == commitMsg.clientOp;
+          assert msg in prepares;
+          assert msg.sender in prepareSendersFromNetwork;
+        } //Trigger for subset operator
         Library.SubsetCardinality(prepareSendersInWorkingWindow, prepareSendersFromNetwork);
       }
     }
+  }
+
+  predicate ReplicaInternalMsg(msg:Messages.Message)
+  {
+    || msg.PrePrepare?
+    || msg.Prepare?
+    || msg.Commit?
+  }
+
+  lemma SendersAreAlwaysFewerThanMessages(msgs:set<Messages.Message>)
+    ensures |setOfSendersForMsgs(msgs)| <= |msgs|
+  {
+    if |msgs| > 0 {
+      var sender :| sender in setOfSendersForMsgs(msgs);
+      var msgsFromSender := set msg | && msg in msgs 
+                                      && msg.sender == sender;
+      var subMsgs := msgs - msgsFromSender;
+      SendersAreAlwaysFewerThanMessages(subMsgs);
+      Library.SubsetCardinality(setOfSendersForMsgs(subMsgs), setOfSendersForMsgs(msgs) - {sender});
+      assert setOfSendersForMsgs(msgs) - {sender} == setOfSendersForMsgs(subMsgs); // Trigger
+    }
+  }
+
+  lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step,
+                            old_msg:Messages.Message, new_msg:Messages.Message)
+    requires NextStep(c, v, v', step)
+    requires c.IsReplica(step.id)
+    requires  var h_c := c.hosts[step.id].replicaConstants;
+              var h_v := v.hosts[step.id].replicaVariables;
+              var h_v' := v'.hosts[step.id].replicaVariables;
+              && Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
+              && h_step.SendCommitStep?
+              && Replica.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
+    requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs && ReplicaInternalMsg(old_msg)
+    requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs && ReplicaInternalMsg(new_msg)
+    requires && old_msg.seqID == new_msg.seqID
+             && old_msg.sender == new_msg.sender
+             && old_msg.Commit?
+             && new_msg.Commit?
+
+    requires Inv(c, v)
+    ensures old_msg == new_msg
+  {
+    var h_c := c.hosts[step.id].replicaConstants;
+    var h_v := v.hosts[step.id].replicaVariables;
+    var h_v' := v'.hosts[step.id].replicaVariables;
+    QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step);
+    assert QuorumOfPreparesInNetwork(c, v', old_msg.seqID, old_msg.clientOp);
+    assert Replica.QuorumOfPrepares(h_c, h_v, new_msg.seqID);
+    var recordedPreparesSenders := h_v.workingWindow.preparesRcvd[new_msg.seqID].Keys;
+    assert |recordedPreparesSenders| >= c.clusterConfig.AgreementQuorum();
+    var prepares := getAllPreparesForSeqID(c, v, new_msg.seqID, new_msg.clientOp);
+    assert recordedPreparesSenders <= setOfSendersForMsgs(prepares) by {
+      forall sender | sender in recordedPreparesSenders ensures sender in setOfSendersForMsgs(prepares) {
+        var msg := h_v.workingWindow.preparesRcvd[new_msg.seqID][sender];
+        assert msg.sender == sender;
+        assert msg.seqID == new_msg.seqID;
+        assert msg.clientOp == new_msg.clientOp;
+        assert msg in v.network.sentMsgs;
+        assert msg in prepares;
+      }
+    }
+    Library.SubsetCardinality(recordedPreparesSenders, setOfSendersForMsgs(prepares));
+    assert |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum();
+    SendersAreAlwaysFewerThanMessages(prepares);
+    assert |prepares| >= |setOfSendersForMsgs(prepares)|;
+    assert |prepares| >= c.clusterConfig.AgreementQuorum();
+    assert QuorumOfPreparesInNetwork(c, v', new_msg.seqID, new_msg.clientOp);
+    assert old_msg == new_msg;
   }
 
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
@@ -173,7 +261,32 @@ module Proof {
         case RecvPrePrepareStep => { assert Inv(c, v'); }
         case SendPrepareStep(seqID) => { assert Inv(c, v'); }
         case RecvPrepareStep => { assert Inv(c, v'); }
-        case SendCommitStep(seqID) => { assert Inv(c, v'); }
+        case SendCommitStep(seqID) => {
+          // HonestReplicasLockOnACommitForAGiveView
+          forall msg1, msg2 | 
+            && msg1 in v'.network.sentMsgs 
+            && msg2 in v'.network.sentMsgs 
+            && msg1.Commit?
+            && msg2.Commit?
+            && msg1.seqID == msg2.seqID
+            && msg1.sender == msg2.sender
+            ensures msg1 == msg2 {
+              if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
+                assert msg1 == msg2;
+              } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
+                assert msg1 == msg2;
+              } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
+                WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
+                assert msg1 == msg2;
+              } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
+                WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
+                assert msg1 == msg2;
+              } else {
+                assert false;
+              }
+            }
+          assert Inv(c, v');
+        }
         case RecvCommitStep() => { assert Inv(c, v'); }
         case DoCommitStep(seqID) => { assert Inv(c, v'); }
     } else if (c.IsClient(step.id)) {
