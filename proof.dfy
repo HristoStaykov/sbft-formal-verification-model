@@ -19,8 +19,8 @@ module Proof {
   import Library
 
   predicate IsHonestReplica(c:Constants, hostId:HostId) 
-    requires c.WF()
   {
+    && c.WF()
     && c.IsReplica(hostId)
   }
 
@@ -60,7 +60,7 @@ module Proof {
           QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
   }
 
-  predicate HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
+  predicate {:opaque} HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
@@ -69,7 +69,21 @@ module Proof {
         && msg1.view == msg2.view
         && msg1.seqID == msg2.seqID
         && msg1.sender == msg2.sender
+        && IsHonestReplica(c, msg1.sender)
         :: msg1 == msg2)
+  }
+
+  predicate {:opaque} CommitMsgsFromHonestSendersAgree(c:Constants, v:Variables) {
+    && (forall msg1, msg2 | 
+        && msg1 in v.network.sentMsgs 
+        && msg2 in v.network.sentMsgs 
+        && msg1.Commit?
+        && msg2.Commit?
+        && msg1.view == msg2.view
+        && msg1.seqID == msg2.seqID
+        && IsHonestReplica(c, msg1.sender)
+        && IsHonestReplica(c, msg2.sender)
+        :: msg1.clientOp == msg2.clientOp)
   }
 
   predicate RecordedPreparesClientOpsMatchPrePrepare(c:Constants, v:Variables) {
@@ -84,7 +98,7 @@ module Proof {
              == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
   }
 
-  predicate RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
+  predicate {:opaque} RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
           && c.IsReplica(replicaIdx)
@@ -96,7 +110,7 @@ module Proof {
              == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
   }
 
-  predicate EveryCommitIsSupportedByRecordedPrepares(c:Constants, v:Variables) {
+  predicate {:opaque} EveryCommitIsSupportedByRecordedPrepares(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs
                            && commitMsg.Commit?
@@ -106,7 +120,7 @@ module Proof {
                                          commitMsg.seqID))
   }
 
-  predicate EveryCommitClientOpMatchesRecordedPrePrepare(c:Constants, v:Variables) {
+  predicate {:opaque} EveryCommitClientOpMatchesRecordedPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs
                            && commitMsg.Commit?
@@ -126,6 +140,7 @@ module Proof {
     && EveryCommitIsSupportedByRecordedPrepares(c, v)
     && EveryCommitClientOpMatchesRecordedPrePrepare(c, v)
     && HonestReplicasLockOnCommitForGivenView(c, v)
+    && CommitMsgsFromHonestSendersAgree(c, v)
   }
 
   function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID,
@@ -153,6 +168,16 @@ module Proof {
   predicate NoNewCommits(c: Constants, v:Variables, v':Variables)
   {
     && (forall msg | msg in v'.network.sentMsgs && msg.Commit? :: msg in v.network.sentMsgs)
+  }
+
+  lemma CommitStability(c: Constants, v:Variables, v':Variables)
+    requires Inv(c, v)
+    requires NoNewCommits(c, v, v')
+    ensures HonestReplicasLockOnCommitForGivenView(c, v')
+    ensures CommitMsgsFromHonestSendersAgree(c, v')
+  {
+    reveal_HonestReplicasLockOnCommitForGivenView();
+    reveal_CommitMsgsFromHonestSendersAgree();
   }
 
   lemma QuorumOfPreparesInNetworkMonotonic(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step)
@@ -305,6 +330,46 @@ module Proof {
     assert old_msg == new_msg;
   }
 
+  lemma HonestReplicasLockOnCommitForGivenViewLemma(c: Constants, v:Variables, v':Variables, 
+                                                    step:Step, h_step:Replica.Step)
+    requires Inv(c, v)
+    requires NextStep(c, v, v', step)
+    requires c.IsReplica(step.id)
+    requires  var h_c := c.hosts[step.id].replicaConstants;
+              var h_v := v.hosts[step.id].replicaVariables;
+              var h_v' := v'.hosts[step.id].replicaVariables;
+              && Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
+              && h_step.SendCommitStep?
+              && Replica.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
+    ensures HonestReplicasLockOnCommitForGivenView(c, v')
+  {
+    reveal_HonestReplicasLockOnCommitForGivenView();
+    forall msg1, msg2 | 
+      && msg1 in v'.network.sentMsgs 
+      && msg2 in v'.network.sentMsgs 
+      && msg1.Commit?
+      && msg2.Commit?
+      && msg1.view == msg2.view
+      && msg1.seqID == msg2.seqID
+      && msg1.sender == msg2.sender
+      && IsHonestReplica(c, msg1.sender)
+      ensures msg1 == msg2 {
+        if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
+          assert msg1 == msg2;
+        } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
+          assert msg1 == msg2;
+        } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
+          WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
+          assert msg1 == msg2;
+        } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
+          WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
+          assert msg1 == msg2;
+        } else {
+          assert false;
+        }
+      }
+  }
+
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
     requires Inv(c, v)
     requires Next(c, v, v')
@@ -324,35 +389,18 @@ module Proof {
       //QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step); // not part of the proof yet
       
       match h_step
-        case SendPrePrepareStep() => { assert Inv(c, v'); }
+        case SendPrePrepareStep() => { 
+          CommitStability(c, v, v');
+          assert Inv(c, v'); 
+        }
         case RecvPrePrepareStep => { assert Inv(c, v'); }
-        case SendPrepareStep(seqID) => { assert Inv(c, v'); }
+        case SendPrepareStep(seqID) => {
+          CommitStability(c, v, v');
+          assert Inv(c, v');
+        }
         case RecvPrepareStep => { assert Inv(c, v'); }
         case SendCommitStep(seqID) => {
-          // HonestReplicasLockOnACommitForAGiveView
-          forall msg1, msg2 | 
-            && msg1 in v'.network.sentMsgs 
-            && msg2 in v'.network.sentMsgs 
-            && msg1.Commit?
-            && msg2.Commit?
-            && msg1.seqID == msg2.seqID
-            && msg1.sender == msg2.sender
-            && msg1.view == msg2.view
-            ensures msg1 == msg2 {
-              if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-                assert msg1 == msg2;
-              } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-                assert msg1 == msg2;
-              } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-                WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
-                assert msg1 == msg2;
-              } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-                WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
-                assert msg1 == msg2;
-              } else {
-                assert false;
-              }
-            }
+          HonestReplicasLockOnCommitForGivenViewLemma(c, v, v', step, h_step);
           assert Inv(c, v');
         }
         case RecvCommitStep() => { assert Inv(c, v'); }
