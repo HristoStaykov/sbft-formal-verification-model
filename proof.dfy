@@ -18,6 +18,12 @@ module Proof {
   import opened SafetySpec
   import Library
 
+  predicate IsHonestReplica(c:Constants, hostId:HostId) 
+    requires c.WF()
+  {
+    && c.IsReplica(hostId)
+  }
+
   // Here's a predicate that will be very useful in constructing inviariant conjuncts.
   predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
@@ -60,6 +66,7 @@ module Proof {
         && msg2 in v.network.sentMsgs 
         && msg1.Commit?
         && msg2.Commit?
+        && msg1.view == msg2.view
         && msg1.seqID == msg2.seqID
         && msg1.sender == msg2.sender
         :: msg1 == msg2)
@@ -77,11 +84,47 @@ module Proof {
              == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
   }
 
+  predicate RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall replicaIdx, seqID, sender |
+          && c.IsReplica(replicaIdx)
+          && var commitMap := v.hosts[replicaIdx].replicaVariables.workingWindow.commitsRcvd;
+          && seqID in commitMap
+          && sender in commitMap[seqID]
+          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some?
+             && v.hosts[replicaIdx].replicaVariables.workingWindow.commitsRcvd[seqID][sender].clientOp 
+             == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
+  }
+
+  predicate EveryCommitIsSupportedByRecordedPrepares(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall commitMsg | && commitMsg in v.network.sentMsgs
+                           && commitMsg.Commit?
+                           && IsHonestReplica(c, commitMsg.sender)
+          :: && Replica.QuorumOfPrepares(c.hosts[commitMsg.sender].replicaConstants, 
+                                         v.hosts[commitMsg.sender].replicaVariables, 
+                                         commitMsg.seqID))
+  }
+
+  predicate EveryCommitClientOpMatchesRecordedPrePrepare(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall commitMsg | && commitMsg in v.network.sentMsgs
+                           && commitMsg.Commit?
+                           && IsHonestReplica(c, commitMsg.sender)
+          :: && var recordedPrePrepare := 
+                v.hosts[commitMsg.sender].replicaVariables.workingWindow.prePreparesRcvd[commitMsg.seqID]; 
+             && recordedPrePrepare.Some?
+             && commitMsg.clientOp == recordedPrePrepare.value.clientOp)
+  }
+
   predicate Inv(c: Constants, v:Variables) {
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
     && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
     && RecordedPreparesClientOpsMatchPrePrepare(c, v)
+    && RecordedCommitsClientOpsMatchPrePrepare(c, v)
+    && EveryCommitIsSupportedByRecordedPrepares(c, v)
+    && EveryCommitClientOpMatchesRecordedPrePrepare(c, v)
     && HonestReplicasLockOnCommitForGivenView(c, v)
   }
 
@@ -203,6 +246,7 @@ module Proof {
     requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs && ReplicaInternalMsg(old_msg)
     requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs && ReplicaInternalMsg(new_msg)
     requires && old_msg.seqID == new_msg.seqID
+             && old_msg.view == new_msg.view
              && old_msg.sender == new_msg.sender
              && old_msg.Commit?
              && new_msg.Commit?
@@ -229,12 +273,35 @@ module Proof {
         assert msg in prepares;
       }
     }
+
+    var prepares' := getAllPreparesForSeqID(c, v, new_msg.seqID, new_msg.clientOp);
+    Library.SubsetCardinality(prepares, prepares');
+
+    assert forall sender | sender in h_v.workingWindow.preparesRcvd[new_msg.seqID]
+                         :: h_v.workingWindow.preparesRcvd[new_msg.seqID][sender].clientOp == new_msg.clientOp;
+
+    assert h_v.workingWindow.prePreparesRcvd[new_msg.seqID].value.clientOp == new_msg.clientOp;
+
+    assert Replica.QuorumOfPrepares(h_c, h_v, old_msg.seqID);
+
+    assert h_v.workingWindow.prePreparesRcvd[old_msg.seqID].value.clientOp == old_msg.clientOp;
+
+    assert forall sender | sender in h_v.workingWindow.preparesRcvd[old_msg.seqID]
+                         :: h_v.workingWindow.preparesRcvd[old_msg.seqID][sender].clientOp == old_msg.clientOp;
+
     Library.SubsetCardinality(recordedPreparesSenders, setOfSendersForMsgs(prepares));
     assert |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum();
     SendersAreAlwaysFewerThanMessages(prepares);
     assert |prepares| >= |setOfSendersForMsgs(prepares)|;
     assert |prepares| >= c.clusterConfig.AgreementQuorum();
     assert QuorumOfPreparesInNetwork(c, v', new_msg.seqID, new_msg.clientOp);
+
+    assert old_msg.seqID == new_msg.seqID;
+    assert old_msg.Commit? && new_msg.Commit?;
+    assert old_msg.sender == new_msg.sender;
+    assert old_msg.view == new_msg.view;
+    assert old_msg.clientOp == new_msg.clientOp;
+
     assert old_msg == new_msg;
   }
 
@@ -270,6 +337,7 @@ module Proof {
             && msg2.Commit?
             && msg1.seqID == msg2.seqID
             && msg1.sender == msg2.sender
+            && msg1.view == msg2.view
             ensures msg1 == msg2 {
               if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
                 assert msg1 == msg2;
