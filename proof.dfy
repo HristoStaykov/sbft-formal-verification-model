@@ -81,7 +81,6 @@ module Proof {
   }
 
   function sendersOf(msgs:set<Messages.Message>) : set<HostIdentifiers.HostId> {
-    //set sender | sender in AllHosts() && (exists msg | msg in msgs :: msg.sender == sender)
     set msg | msg in msgs :: msg.sender
   }
 
