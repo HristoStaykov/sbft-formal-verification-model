@@ -73,22 +73,22 @@ module Proof {
     //&& HonestReplicasLockOnCommitForGivenView(c, v)
   }
 
-  function getAllPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID) : set<Messages.Message> 
+  function sentPreparesForSeqID(c: Constants, v:Variables, seqID:Messages.SequenceID) : set<Messages.Message> 
   {
     set msg | && msg in v.network.sentMsgs 
               && msg.Prepare?
               && msg.seqID == seqID
   }
 
-  function setOfSendersForMsgs(msgs:set<Messages.Message>) : set<HostIdentifiers.HostId> {
+  function sendersOf(msgs:set<Messages.Message>) : set<HostIdentifiers.HostId> {
     //set sender | sender in AllHosts() && (exists msg | msg in msgs :: msg.sender == sender)
     set msg | msg in msgs :: msg.sender
   }
 
   predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, seqID:Messages.SequenceID) {
     && v.WF(c)
-    && var prepares := getAllPreparesForSeqID(c, v, seqID);
-    && |setOfSendersForMsgs(prepares)| >= c.clusterConfig.AgreementQuorum()
+    && var prepares := sentPreparesForSeqID(c, v, seqID);
+    && |sendersOf(prepares)| >= c.clusterConfig.AgreementQuorum()
     //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
   }
 
@@ -110,8 +110,8 @@ module Proof {
     forall seqID | QuorumOfPreparesInNetwork(c, v, seqID)
                                   ensures QuorumOfPreparesInNetwork(c, v', seqID)
     {
-      var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, seqID));
-      var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', seqID));
+      var senders := sendersOf(sentPreparesForSeqID(c, v, seqID));
+      var senders' := sendersOf(sentPreparesForSeqID(c, v', seqID));
       Library.SubsetCardinality(senders, senders');
     }
   }
@@ -127,16 +127,16 @@ module Proof {
       QuorumOfPreparesInNetwork(c, v', commitMsg.seqID) {
       if(commitMsg in v.network.sentMsgs) { // the commitMsg has been sent in a previous step
         // In this case, the proof is trivial - we just need to "teach" Dafny about subset cardinality
-        var senders := setOfSendersForMsgs(getAllPreparesForSeqID(c, v, commitMsg.seqID));
-        var senders' := setOfSendersForMsgs(getAllPreparesForSeqID(c, v', commitMsg.seqID));
+        var senders := sendersOf(sentPreparesForSeqID(c, v, commitMsg.seqID));
+        var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.seqID));
         Library.SubsetCardinality(senders, senders');
       } else { // the commitMsg is being sent in the current step
-        var prepares := getAllPreparesForSeqID(c, v, commitMsg.seqID);
-        var prepares' := getAllPreparesForSeqID(c, v', commitMsg.seqID);
+        var prepares := sentPreparesForSeqID(c, v, commitMsg.seqID);
+        var prepares' := sentPreparesForSeqID(c, v', commitMsg.seqID);
         assert prepares == prepares'; // Trigger (hint) - sending a commitMsg does not affect the set of prepares
         
         // Prove that the prepares in the working window are a subset of the prepares in the network:
-        var prepareSendersFromNetwork := setOfSendersForMsgs(prepares);
+        var prepareSendersFromNetwork := sendersOf(prepares);
         var h_v := v.hosts[step.id];
         var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
         assert (forall sender | sender in prepareSendersInWorkingWindow 
