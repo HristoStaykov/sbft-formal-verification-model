@@ -21,10 +21,10 @@ module Replica {
                                && ValidHostId(ps[x].sender)
   }
 
-  type CommitProofSet = set<Message>
+  type CommitProofSet = map<HostId, Message>
   predicate CommitProofSetWF(cs:CommitProofSet) {
-      && forall x | x in cs :: && x.Commit?
-                               && ValidHostId(x.sender)
+      && forall x | x in cs :: && cs[x].Commit?
+                               && ValidHostId(cs[x].sender)
   }
 
   type PrePreparesRcvd = imap<SequenceID, Option<Message>>
@@ -165,7 +165,7 @@ module Replica {
     && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
     && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
-    && (forall x | x in v.workingWindow.commitsRcvd[p.seqID] && x.seqID == p.seqID :: x.sender != p.sender)
+    && p.sender !in v.workingWindow.commitsRcvd[p.seqID] // We stick to the first vote from a peer.
   }
 
   predicate RecvCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
@@ -176,8 +176,8 @@ module Replica {
     && IsValidCommitToAccept(c, v, msg)
     && v' == v.(workingWindow := 
                v.workingWindow.(commitsRcvd :=
-                                 v.workingWindow.commitsRcvd[msg.seqID :=
-                                 v.workingWindow.commitsRcvd[msg.seqID] + {msg}]))
+                                 v.workingWindow.commitsRcvd[msg.seqID := 
+                                 v.workingWindow.commitsRcvd[msg.seqID][msg.sender := msg]]))
   }
 
   predicate QuorumOfCommits(c:Constants, v:Variables, seqID:SequenceID) {
@@ -244,7 +244,7 @@ module Replica {
     && (forall seqID | seqID in v.workingWindow.prePreparesRcvd
                 :: v.workingWindow.prePreparesRcvd[seqID].None?)
     && (forall seqID | seqID in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[seqID] == map[])
-    && (forall seqID | seqID in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[seqID] == {})
+    && (forall seqID | seqID in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[seqID] == map[])
   }
 
   // JayNF
