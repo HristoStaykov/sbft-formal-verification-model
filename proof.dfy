@@ -24,11 +24,11 @@ module Proof {
     && c.IsReplica(hostId)
   }
 
-  // Here's a predicate that will be very useful in constructing inviariant conjuncts.
+  // Here's a predicate that will be very useful in constructing invariant conjuncts.
   predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID | 
-              && c.IsReplica(replicaIdx)
+              && IsHonestReplica(c, replicaIdx)
               && assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd);
                 v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some? 
                 :: v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
@@ -37,7 +37,7 @@ module Proof {
   predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId)
   {
     && v.WF(c)
-    && c.IsReplica(observer)
+    && IsHonestReplica(c, observer)
     && (forall sender, seqID | 
               && assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].replicaVariables.workingWindow.preparesRcvd);
                 sender in v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID]
@@ -50,14 +50,16 @@ module Proof {
   predicate RecordedPreparesInAllHostsRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall observer | 
-            && c.IsReplica(observer)
+            && IsHonestReplica(c, observer)
                 :: RecordedPreparesRecvdCameFromNetwork(c, v, observer))
   }
 
   predicate EveryCommitMsgIsSupportedByAQuorumOfPrepares(c:Constants, v:Variables) {
     && v.WF(c)
-    && (forall commitMsg | commitMsg in v.network.sentMsgs && commitMsg.Commit? ::
-          QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
+    && (forall commitMsg | && commitMsg in v.network.sentMsgs 
+                           && commitMsg.Commit? 
+                           && IsHonestReplica(c, commitMsg.sender)
+          :: QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
   }
 
   predicate HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
@@ -76,7 +78,7 @@ module Proof {
   predicate RecordedPreparesClientOpsMatchPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
-          && c.IsReplica(replicaIdx)
+          && IsHonestReplica(c, replicaIdx)
           && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
           && seqID in prepareMap
           && sender in prepareMap[seqID]
@@ -88,7 +90,7 @@ module Proof {
   predicate RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
-          && c.IsReplica(replicaIdx)
+          && IsHonestReplica(c, replicaIdx)
           && var commitMap := v.hosts[replicaIdx].replicaVariables.workingWindow.commitsRcvd;
           && seqID in commitMap
           && sender in commitMap[seqID]
@@ -181,7 +183,9 @@ module Proof {
   {
     // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares,
     // by selecting an arbitrary commitMsg instance
-    forall commitMsg | commitMsg in v'.network.sentMsgs && commitMsg.Commit? ensures 
+    forall commitMsg | && commitMsg in v'.network.sentMsgs 
+                       && commitMsg.Commit? 
+                       && IsHonestReplica(c, commitMsg.sender) ensures 
       QuorumOfPreparesInNetwork(c, v', commitMsg.seqID, commitMsg.clientOp) {
       if(commitMsg in v.network.sentMsgs) { // the commitMsg has been sent in a previous step
         // In this case, the proof is trivial - we just need to "teach" Dafny about subset cardinality
