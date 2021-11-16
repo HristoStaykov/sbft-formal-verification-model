@@ -133,7 +133,21 @@ module Proof {
              && commitMsg.clientOp == recordedPrePrepare.value.clientOp)
   }
 
+  // predicate PrePreparesCarrySameClientOpsForGivenSeqID(c:Constants, v:Variables)
+  // {
+  //   && v.WF(c)
+  //   && (forall prePrepare1, prePrepare2 | && prePrepare1 in v.network.sentMsgs
+  //                                         && prePrepare2 in v.network.sentMsgs
+  //                                         && prePrepare1.PrePrepare?
+  //                                         && prePrepare2.PrePrepare?
+  //                                         && prePrepare1.sender == prePrepare2.sender
+  //                                         && prePrepare1.seqID == prePrepare2.seqID
+  //                                         && IsHonestReplica(c, prePrepare1.sender)
+  //                                       :: prePrepare1 == prePrepare2)
+  // }
+
   predicate Inv(c: Constants, v:Variables) {
+    //&& PrePreparesCarrySameClientOpsForGivenSeqID(c, v)
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
     && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v)
@@ -171,16 +185,20 @@ module Proof {
     && (forall msg | msg in v'.network.sentMsgs && msg.Commit? :: msg in v.network.sentMsgs)
   }
 
-  lemma CommitMsgStability(c: Constants, v:Variables, v':Variables)
+  lemma CommitMsgStability(c: Constants, v:Variables, v':Variables, step:Step)
     requires Inv(c, v)
-    requires NoNewCommits(c, v, v')
-    ensures HonestReplicasLockOnCommitForGivenView(c, v')
-    ensures CommitMsgsFromHonestSendersAgree(c, v')
+    requires NextStep(c, v, v', step)
+    ensures RecordedCommitsClientOpsMatchPrePrepare(c, v')
+    ensures EveryCommitIsSupportedByRecordedPrepares(c, v')
     ensures EveryCommitClientOpMatchesRecordedPrePrepare(c, v')
+    ensures HonestReplicasLockOnCommitForGivenView(c, v')
+    ensures EveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v')
   {
-    reveal_HonestReplicasLockOnCommitForGivenView();
-    reveal_CommitMsgsFromHonestSendersAgree();
+    ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
+    reveal_RecordedCommitsClientOpsMatchPrePrepare();
+    reveal_EveryCommitIsSupportedByRecordedPrepares();
     reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
+    reveal_HonestReplicasLockOnCommitForGivenView();
   }
 
   lemma QuorumOfPreparesInNetworkMonotonic(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step)
@@ -254,7 +272,7 @@ module Proof {
   lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step,
                             old_msg:Messages.Message, new_msg:Messages.Message)
     requires NextStep(c, v, v', step)
-    requires c.IsReplica(step.id)
+    requires IsHonestReplica(c, step.id)
     requires  var h_c := c.hosts[step.id].replicaConstants;
               var h_v := v.hosts[step.id].replicaVariables;
               var h_v' := v'.hosts[step.id].replicaVariables;
@@ -302,7 +320,9 @@ module Proof {
 
     assert Replica.QuorumOfPrepares(h_c, h_v, old_msg.seqID);
 
-    assert h_v.workingWindow.prePreparesRcvd[old_msg.seqID].value.clientOp == old_msg.clientOp;
+    assert h_v.workingWindow.prePreparesRcvd[old_msg.seqID].value.clientOp == old_msg.clientOp by {
+      reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
+    }
 
     assert forall sender | sender in h_v.workingWindow.preparesRcvd[old_msg.seqID]
                          :: h_v.workingWindow.preparesRcvd[old_msg.seqID][sender].clientOp == old_msg.clientOp;
@@ -388,7 +408,7 @@ module Proof {
     requires SendClientOperationIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-
+    CommitMsgStability(c, v, v', step);
   }
 
   predicate SendPrePrepareIsEnabled(c: Constants, v:Variables, v':Variables,
@@ -410,7 +430,7 @@ module Proof {
     requires SendPrePrepareIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-    CommitMsgStability(c, v, v');
+    CommitMsgStability(c, v, v', step);
   }
 
   predicate SendPrepareIsEnabled(c: Constants, v:Variables, v':Variables,
@@ -432,7 +452,7 @@ module Proof {
     requires SendPrepareIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-    CommitMsgStability(c, v, v');
+    CommitMsgStability(c, v, v', step);
   }
 
   predicate RecvPrePrepareIsEnabled(c: Constants, v:Variables, v':Variables,
@@ -454,7 +474,7 @@ module Proof {
     requires RecvPrePrepareIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-    
+    CommitMsgStability(c, v, v', step);
   }
 
   predicate RecvPrepareIsEnabled(c: Constants, v:Variables, v':Variables,
@@ -476,7 +496,7 @@ module Proof {
     requires RecvPrepareIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-    
+    CommitMsgStability(c, v, v', step);
   }
 
   predicate RecvCommitIsEnabled(c: Constants, v:Variables, v':Variables,
@@ -498,7 +518,7 @@ module Proof {
     requires RecvCommitIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-
+    CommitMsgStability(c, v, v', step);
   }
 
   predicate DoCommitIsEnabled(c: Constants, v:Variables, v':Variables,
@@ -520,7 +540,7 @@ module Proof {
     requires DoCommitIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-    reveal_RecordedCommitsClientOpsMatchPrePrepare();
+    CommitMsgStability(c, v, v', step);
   }
 
   lemma SendCommitStepPreservesInv(c: Constants, v:Variables, v':Variables, 
@@ -528,6 +548,7 @@ module Proof {
     requires SentCommitIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
+    ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
     reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
     reveal_RecordedCommitsClientOpsMatchPrePrepare();
     reveal_EveryCommitIsSupportedByRecordedPrepares();
@@ -539,8 +560,8 @@ module Proof {
       {
         if(commitMsg !in v.network.sentMsgs) {
           var h_v := v.hosts[step.id].replicaVariables;
-          var senders := h_v.workingWindow.preparesRcvd.Keys;
-          var senders' := sendersOf(sentPreparesForSeqID(c, v', seqID, clientOp));
+          var senders := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+          var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.seqID, commitMsg.clientOp));
           Library.SubsetCardinality(senders, senders');
         }
       }
