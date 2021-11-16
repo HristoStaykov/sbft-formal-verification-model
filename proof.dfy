@@ -211,13 +211,6 @@ module Proof {
     }
   }
 
-  predicate ReplicaInternalMsg(msg:Messages.Message)
-  {
-    || msg.PrePrepare?
-    || msg.Prepare?
-    || msg.Commit?
-  }
-
   lemma SendersAreAlwaysFewerThanMessages(msgs:set<Messages.Message>)
     ensures |sendersOf(msgs)| <= |msgs|
   {
@@ -242,13 +235,13 @@ module Proof {
               && Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
               && h_step.SendCommitStep?
               && Replica.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
-    requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs && ReplicaInternalMsg(old_msg)
-    requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs && ReplicaInternalMsg(new_msg)
-    requires && old_msg.seqID == new_msg.seqID
+    requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs
+    requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs
+    requires && old_msg.Commit?
+             && new_msg.Commit?
+             && old_msg.seqID == new_msg.seqID
              && old_msg.view == new_msg.view
              && old_msg.sender == new_msg.sender
-             && old_msg.Commit?
-             && new_msg.Commit?
 
     requires Inv(c, v)
     ensures old_msg == new_msg
