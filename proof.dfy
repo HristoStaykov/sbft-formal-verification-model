@@ -548,11 +548,7 @@ module Proof {
     requires SentCommitIsEnabled(c, v, v', step, h_step)
     ensures Inv(c, v')
   {
-    ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
-    reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
-    reveal_RecordedCommitsClientOpsMatchPrePrepare();
-    reveal_EveryCommitIsSupportedByRecordedPrepares();
-    HonestReplicasLockOnCommitForGivenViewLemma(c, v, v', step, h_step);
+    CommitMsgStability(c, v, v', step);
     forall commitMsg | && commitMsg in v'.network.sentMsgs 
                        && commitMsg.Commit? 
                        && IsHonestReplica(c, commitMsg.sender)
@@ -562,6 +558,7 @@ module Proof {
           var h_v := v.hosts[step.id].replicaVariables;
           var senders := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
           var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.seqID, commitMsg.clientOp));
+          assert forall sender | sender in senders :: sender in senders'; //Trigger.
           Library.SubsetCardinality(senders, senders');
         }
       }
