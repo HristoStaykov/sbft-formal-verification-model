@@ -62,6 +62,20 @@ module Proof {
           :: QuorumOfPreparesInNetwork(c, v, commitMsg.seqID, commitMsg.clientOp) )
   }
 
+  predicate HonestReplicasLockOnPrepareForGivenView(c: Constants, v:Variables)
+  {
+    && (forall msg1, msg2 | 
+        && msg1 in v.network.sentMsgs 
+        && msg2 in v.network.sentMsgs 
+        && msg1.Prepare?
+        && msg2.Prepare?
+        && msg1.view == msg2.view
+        && msg1.seqID == msg2.seqID
+        && msg1.sender == msg2.sender
+        && IsHonestReplica(c, msg1.sender)
+        :: msg1 == msg2)
+  }
+
   predicate {:opaque} HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
@@ -155,6 +169,7 @@ module Proof {
     && RecordedCommitsClientOpsMatchPrePrepare(c, v)
     && EveryCommitIsSupportedByRecordedPrepares(c, v)
     && EveryCommitClientOpMatchesRecordedPrePrepare(c, v)
+    && HonestReplicasLockOnPrepareForGivenView(c, v)
     && HonestReplicasLockOnCommitForGivenView(c, v)
     && CommitMsgsFromHonestSendersAgree(c, v)
   }
@@ -185,6 +200,92 @@ module Proof {
     && (forall msg | msg in v'.network.sentMsgs && msg.Commit? :: msg in v.network.sentMsgs)
   }
 
+  lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step,
+                            msg1:Messages.Message, msg2:Messages.Message)
+    requires Inv(c, v)
+    requires NextStep(c, v, v', step)
+    requires msg1 in v'.network.sentMsgs 
+    requires msg2 in v'.network.sentMsgs 
+    requires msg1.Commit?
+    requires msg2.Commit?
+    requires msg1.view == msg2.view
+    requires msg1.seqID == msg2.seqID
+    requires msg1 in v.network.sentMsgs
+    requires msg2 !in v.network.sentMsgs
+    requires IsHonestReplica(c, msg1.sender)
+    requires IsHonestReplica(c, msg2.sender)
+    ensures msg1.clientOp == msg2.clientOp
+  {
+    //h_step:Replica.Step
+    var prepares1 := sentPreparesForSeqID(c, v, msg1.seqID, msg1.clientOp);
+    var senders1 := sendersOf(prepares1);
+    assert |senders1| >= c.clusterConfig.AgreementQuorum();
+
+    var h_c := c.hosts[step.id].replicaConstants;
+    var h_v := v.hosts[step.id].replicaVariables;
+    var h_v' := v'.hosts[step.id].replicaVariables;
+    var h_step :| Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step);
+
+    var senders2 := h_v.workingWindow.preparesRcvd[h_step.seqID].Keys;
+    assert |senders2| >= c.clusterConfig.AgreementQuorum();
+
+    var equivocatingHonestSender := FindQuorumIntersection(c, senders1, senders2);
+    var equivocatingPrepare1 := Messages.Prepare(equivocatingHonestSender, msg1.view,
+                                        msg1.seqID, msg1.clientOp);
+    var equivocatingPrepare2 := Messages.Prepare(equivocatingHonestSender, msg2.view,
+                                        msg2.seqID, msg2.clientOp);
+    assert equivocatingPrepare1 in prepares1;
+    assert equivocatingPrepare1 in v.network.sentMsgs;
+
+    assert equivocatingPrepare2 == h_v.workingWindow.preparesRcvd[h_step.seqID][equivocatingHonestSender];
+
+    assert equivocatingPrepare2 in v.network.sentMsgs;
+
+    if(msg1.clientOp != msg2.clientOp) {
+
+    }
+  }
+
+  lemma FindQuorumIntersection(c: Constants, senders1:set<HostIdentifiers.HostId>, senders2:set<HostIdentifiers.HostId>) 
+    returns (common:HostIdentifiers.HostId)
+    requires c.WF()
+    requires |senders1| >= c.clusterConfig.AgreementQuorum()//TODO: rename hosts
+    requires |senders2| >= c.clusterConfig.AgreementQuorum()
+    ensures IsHonestReplica(c, common)
+    ensures common in senders1
+    ensures common in senders2
+  {
+    var honestReplicas := set sender | 0 <= sender < c.clusterConfig.N() && IsHonestReplica(c, sender);//TODO: move to clusterconfig
+    var honestSenders1 := senders1 * honestReplicas;
+    var honestSenders2 := senders2 * honestReplicas;
+
+    assert |honestSenders1| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
+    assert |honestSenders2| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
+
+    if(honestSenders1 * honestSenders2 == {}) {
+      assert |honestSenders1 + honestSenders2| == |honestSenders1| + |honestSenders2|; // Doc: Follows from contradiction hypothesis
+      assert honestSenders1 + honestSenders2 <= honestReplicas;
+      assert |honestSenders1 + honestSenders2| <= |honestReplicas|;
+      assert |honestReplicas| < |honestSenders1| + |honestSenders2|;
+      assert |honestSenders1| + |honestSenders2| <= |honestReplicas|;
+
+      
+      var x := |honestReplicas|;
+      var y := |honestSenders1| + |honestSenders2|;
+      var z := x;
+
+      assert x < y;
+      assert y <= z;
+      assert x < z;
+      assert x < x;
+      
+      assert false; // Proof by contradiction.
+    }
+    //var result:HostIdentifiers.HostId :| (honestSenders1 * honestSenders2);
+    var result :| result in (honestSenders1 * honestSenders2);
+    common := result;
+  }
+
   lemma ProofCommitMsgsFromHonestSendersAgree(c: Constants, v:Variables, v':Variables, step:Step)
     requires Inv(c, v)
     requires NextStep(c, v, v', step)
@@ -202,15 +303,15 @@ module Proof {
       && IsHonestReplica(c, msg2.sender)
       ensures msg1.clientOp == msg2.clientOp {
         if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-          assert msg1 == msg2;
+          assert msg1.clientOp == msg2.clientOp;
         } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-          assert msg1 == msg2;
+          assert msg1.clientOp == msg2.clientOp;
         } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-          //WlogCommitAgreement(c, v, v', step, h_step, msg1, msg2);
-          assert msg1 == msg2;
+          WlogCommitAgreement(c, v, v', step, msg1, msg2);
+          assert msg1.clientOp == msg2.clientOp;
         } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-          //WlogCommitAgreement(c, v, v', step, h_step, msg2, msg1);
-          assert msg1 == msg2;
+          WlogCommitAgreement(c, v, v', step, msg2, msg1);
+          assert msg1.clientOp == msg2.clientOp;
         } else {
           assert false;
         }
