@@ -275,6 +275,12 @@ module Proof {
     }
   }
 
+  function getAllReplicas(c: Constants) : (hostsSet:set<HostIdentifiers.HostId>)
+    ensures |hostsSet| == c.clusterConfig.N()
+  {
+    set host | 0 <= host < c.clusterConfig.N()
+  }
+
   lemma FindQuorumIntersection(c: Constants, senders1:set<HostIdentifiers.HostId>, senders2:set<HostIdentifiers.HostId>) 
     returns (common:HostIdentifiers.HostId)
     requires c.WF()
@@ -284,24 +290,57 @@ module Proof {
     ensures common in senders1
     ensures common in senders2
   {
-    var honestReplicas := set sender | 0 <= sender < c.clusterConfig.N() && IsHonestReplica(c, sender);//TODO: move to clusterconfig
-    var honestSenders1 := senders1 * honestReplicas;
-    var honestSenders2 := senders2 * honestReplicas;
+    // var honestReplicas := set sender | 0 <= sender < c.clusterConfig.N() && IsHonestReplica(c, sender);//TODO: move to clusterconfig
+    // assert |honestReplicas| >= 1;
+    // var honestSenders1 := senders1 * honestReplicas;
+    // var honestSenders2 := senders2 * honestReplicas;
 
-    assert |honestSenders1| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
-    assert |honestSenders2| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
+    // assert |honestSenders1| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
+    // assert |honestSenders2| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
 
-    if(honestSenders1 * honestSenders2 == {}) {
-      assert |honestSenders1 + honestSenders2| == |honestSenders1| + |honestSenders2|; // Doc: Follows from contradiction hypothesis
-      assert honestSenders1 + honestSenders2 <= honestReplicas;
-      assert |honestSenders1 + honestSenders2| <= |honestReplicas|;
-      assert |honestReplicas| < |honestSenders1| + |honestSenders2|;
-      assert |honestSenders1| + |honestSenders2| <= |honestReplicas|;
+    // if(honestSenders1 * honestSenders2 == {}) {
+    //   assert |honestSenders1 + honestSenders2| == |honestSenders1| + |honestSenders2|; // Doc: Follows from contradiction hypothesis
+    //   assert honestSenders1 + honestSenders2 <= honestReplicas;
+    //   assert |honestSenders1 + honestSenders2| <= |honestReplicas|;
+    //   assert |honestReplicas| < |honestSenders1| + |honestSenders2|;
+    //   assert |honestSenders1| + |honestSenders2| <= |honestReplicas|;
       
+    //   assert false; // Proof by contradiction.
+    // }
+    // //var result:HostIdentifiers.HostId :| (honestSenders1 * honestSenders2);
+    // var result :| result in (honestSenders1 * honestSenders2);
+    // common := result;
+
+    var f := c.clusterConfig.F();
+    var n := c.clusterConfig.N();
+
+    assert 2 * f + 1 <= |senders1|;
+    assert 2 * f + 1 <= |senders2|;
+
+    var commonSenders := senders1 * senders2;
+    if(|commonSenders| < f + 1) {
+      calc {
+        n;
+        == (3 * f) + 1;
+        == 2*f+1 + 2*f+1 - (f+1);
+        < |senders1| + |senders2| - |senders1*senders2|;
+        == |senders1 + senders2|; 
+        <= {
+          Library.SubsetCardinality(senders1 + senders2, getAllReplicas(c));
+          assert senders1 + senders2 < getAllReplicas(c);
+        }
+        n;
+      }
       assert false; // Proof by contradiction.
     }
-    //var result:HostIdentifiers.HostId :| (honestSenders1 * honestSenders2);
-    var result :| result in (honestSenders1 * honestSenders2);
+    assert f + 1 <= |commonSenders|;
+
+
+    var honestReplicas := set sender | 0 <= sender < n && IsHonestReplica(c, sender);
+    var commonHonest := commonSenders * honestReplicas;
+    assert 1 <= |commonHonest|;
+
+    var result :| result in commonHonest;
     common := result;
   }
 
