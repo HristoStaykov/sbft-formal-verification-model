@@ -58,7 +58,7 @@ editor if you prefer.
 From the container started as described in the previous step run:
 
 ```bash
-dafny proof.dfy
+dafny /vcsCores:$(nproc) proof.dfy
 ```
 
 If everything is working, you should see something like:
