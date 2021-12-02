@@ -1,4 +1,7 @@
+include "network.s.dfy"
+
 module ClusterConfig {
+  import opened HostIdentifiers
 
   datatype Constants = Constants(
     maxByzantineFaultyReplicas:nat,
@@ -39,6 +42,20 @@ module ClusterConfig {
       requires WF()
     {
       2 * F() + 1
+    }
+
+    predicate IsReplica(id:HostId)
+      requires WF()
+    {
+      && ValidHostId(id)
+      && 0 <= id < N()
+    }
+
+    predicate IsClient(id:HostId)
+      requires WF()
+    {
+      && ValidHostId(id)
+      && N() <= id < NumHosts()
     }
   }
 }

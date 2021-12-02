@@ -16,15 +16,15 @@ module Replica {
   import ClusterConfig
                      
   type PrepareProofSet = map<HostId, Message> 
-  predicate PrepareProofSetWF(ps:PrepareProofSet) {
+  predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet) {
       && forall x | x in ps :: && ps[x].Prepare? 
-                               && ValidHostId(ps[x].sender)
+                               && c.clusterConfig.IsReplica(ps[x].sender)
   }
 
   type CommitProofSet = map<HostId, Message>
-  predicate CommitProofSetWF(cs:CommitProofSet) {
+  predicate CommitProofSetWF(c:Constants, cs:CommitProofSet) {
       && forall x | x in cs :: && cs[x].Commit?
-                               && ValidHostId(cs[x].sender)
+                               && c.clusterConfig.IsReplica(cs[x].sender)
   }
 
   type PrePreparesRcvd = imap<SequenceID, Option<Message>>
@@ -43,14 +43,14 @@ module Replica {
     preparesRcvd:imap<SequenceID, PrepareProofSet>,
     commitsRcvd:imap<SequenceID, CommitProofSet>
   ) {
-    predicate WF()
+    predicate WF(c:Constants)
     {
       && FullImap(committedClientOperations)
       && FullImap(preparesRcvd)
       && FullImap(commitsRcvd)
       && PrePreparesRcvdWF(prePreparesRcvd)
-      && (forall seqID | seqID in preparesRcvd :: PrepareProofSetWF(preparesRcvd[seqID]))
-      && (forall seqID | seqID in commitsRcvd :: CommitProofSetWF(commitsRcvd[seqID]))
+      && (forall seqID | seqID in preparesRcvd :: PrepareProofSetWF(c, preparesRcvd[seqID]))
+      && (forall seqID | seqID in commitsRcvd :: CommitProofSetWF(c, commitsRcvd[seqID]))
     }
   }
 
@@ -61,7 +61,7 @@ module Replica {
     // clusterSize is in clusterConfig.
     predicate WF() {
       && clusterConfig.WF()
-      && ValidHostId(myId)
+      && clusterConfig.IsReplica(myId)
     }
 
     predicate Configure(id:HostId, clusterConf:ClusterConfig.Constants) {
@@ -79,7 +79,7 @@ module Replica {
     predicate WF(c:Constants)
     {
       && c.WF()
-      && workingWindow.WF()
+      && workingWindow.WF(c)
     }
   }
 
@@ -106,7 +106,7 @@ module Replica {
   {
     && v.WF(c)
     && p.PrePrepare?
-    && ValidHostId(p.sender)
+    && c.clusterConfig.IsReplica(p.sender)
     && v.viewIsActive
     && p.view == v.view
     && p.sender == CurrentPrimary(c, v)
@@ -132,7 +132,7 @@ module Replica {
   {
     && v.WF(c)
     && p.Prepare?
-    && ValidHostId(p.sender)
+    && c.clusterConfig.IsReplica(p.sender)
     && v.viewIsActive
     && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?
@@ -160,7 +160,7 @@ module Replica {
   {
     && v.WF(c)
     && p.Prepare?
-    && ValidHostId(p.sender)
+    && c.clusterConfig.IsReplica(p.sender)
     && v.viewIsActive
     && p.view == v.view
     && v.workingWindow.prePreparesRcvd[p.seqID].Some?

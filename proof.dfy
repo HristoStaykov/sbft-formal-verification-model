@@ -21,7 +21,7 @@ module Proof {
   predicate IsHonestReplica(c:Constants, hostId:HostId) 
   {
     && c.WF()
-    && c.IsReplica(hostId)
+    && c.clusterConfig.IsReplica(hostId)
   }
 
   // Here's a predicate that will be very useful in constructing invariant conjuncts.
@@ -102,6 +102,18 @@ module Proof {
         :: msg1.clientOp == msg2.clientOp)
   }
 
+  predicate RecordedPreparesHaveValidSenderID(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall replicaIdx, seqID, sender |
+          && IsHonestReplica(c, replicaIdx)
+          && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
+          && seqID in prepareMap
+          && sender in prepareMap[seqID]
+          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd[seqID][sender].sender == sender
+             && c.clusterConfig.IsReplica(sender)
+        )
+  }
+
   predicate RecordedPreparesClientOpsMatchPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
@@ -109,9 +121,9 @@ module Proof {
           && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
           && seqID in prepareMap
           && sender in prepareMap[seqID]
-          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some?         
-             && v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd[seqID][sender].clientOp 
-             == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
+          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some?
+             && v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd[seqID][sender].clientOp
+                == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
   }
 
   predicate {:opaque} RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
@@ -151,12 +163,24 @@ module Proof {
     && v.WF(c)
     && (forall observer, seqID, sender | 
                            && IsHonestReplica(c, observer)
-                           && c.IsReplica(sender)
+                           && c.clusterConfig.IsReplica(sender)
                            && var replicaVars := v.hosts[observer].replicaVariables;
                            && seqID in replicaVars.workingWindow.preparesRcvd
                            && sender in replicaVars.workingWindow.preparesRcvd[seqID]
                 :: && var replicaVars := v.hosts[observer].replicaVariables;
                    && replicaVars.view == replicaVars.workingWindow.preparesRcvd[seqID][sender].view)
+  }
+
+  predicate SentPreparesMatchRecordedPrePrepareIfHostInSameView(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall prepare | 
+                && prepare in v.network.sentMsgs
+                && prepare.Prepare?
+                && IsHonestReplica(c, prepare.sender)
+                && prepare.view == v.hosts[prepare.sender].replicaVariables.view
+                  :: && v.hosts[prepare.sender].replicaVariables.workingWindow.prePreparesRcvd[prepare.seqID].Some?
+                     && v.hosts[prepare.sender].replicaVariables.workingWindow.prePreparesRcvd[prepare.seqID].value.clientOp
+                        == prepare.clientOp)
   }
 
   // predicate PrePreparesCarrySameClientOpsForGivenSeqID(c:Constants, v:Variables)
@@ -174,6 +198,8 @@ module Proof {
 
   predicate Inv(c: Constants, v:Variables) {
     //&& PrePreparesCarrySameClientOpsForGivenSeqID(c, v)
+    && RecordedPreparesHaveValidSenderID(c, v)
+    && SentPreparesMatchRecordedPrePrepareIfHostInSameView(c, v)
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
     && RecordedPreparesInAllHostsRecvdCameFromNetwork(c, v)
     && RecordedPreparesMatchHostView(c, v)
@@ -189,12 +215,14 @@ module Proof {
 
   function sentPreparesForSeqID(c: Constants, v:Variables, view:nat, seqID:Messages.SequenceID,
                                   clientOp:Messages.ClientOperation) : set<Messages.Message> 
+    requires v.WF(c)
   {
     set msg | && msg in v.network.sentMsgs 
               && msg.Prepare?
               && msg.view == view
               && msg.seqID == seqID
               && msg.clientOp == clientOp
+              && msg.sender in getAllReplicas(c)
   }
 
   function sendersOf(msgs:set<Messages.Message>) : set<HostIdentifiers.HostId> {
@@ -243,6 +271,10 @@ module Proof {
     var senders2 := h_v.workingWindow.preparesRcvd[h_step.seqID].Keys;
     assert |senders2| >= c.clusterConfig.AgreementQuorum();
 
+    forall prepare | prepare in prepares1 ensures prepare.sender in getAllReplicas(c) {
+      
+    }
+    assert senders2 <= getAllReplicas(c);
     var equivocatingHonestSender := FindQuorumIntersection(c, senders1, senders2);
     var equivocatingPrepare1 := Messages.Prepare(equivocatingHonestSender, msg1.view,
                                         msg1.seqID, msg1.clientOp);
@@ -275,10 +307,19 @@ module Proof {
     }
   }
 
+  function GetKReplicas(k:nat) : (hosts:set<HostIdentifiers.HostId>)
+    ensures |hosts| == k
+    ensures forall host | host in hosts :: 0 <= host < k
+  {
+    if k == 0 then {}
+    else GetKReplicas(k-1) + {k - 1}
+  }
+
   function getAllReplicas(c: Constants) : (hostsSet:set<HostIdentifiers.HostId>)
+    requires c.WF()
     ensures |hostsSet| == c.clusterConfig.N()
   {
-    set host | 0 <= host < c.clusterConfig.N()
+    GetKReplicas(c.clusterConfig.N())
   }
 
   lemma FindQuorumIntersection(c: Constants, senders1:set<HostIdentifiers.HostId>, senders2:set<HostIdentifiers.HostId>) 
@@ -286,31 +327,12 @@ module Proof {
     requires c.WF()
     requires |senders1| >= c.clusterConfig.AgreementQuorum()//TODO: rename hosts
     requires |senders2| >= c.clusterConfig.AgreementQuorum()
+    requires senders1 <= getAllReplicas(c)
+    requires senders2 <= getAllReplicas(c)
     ensures IsHonestReplica(c, common)
     ensures common in senders1
     ensures common in senders2
   {
-    // var honestReplicas := set sender | 0 <= sender < c.clusterConfig.N() && IsHonestReplica(c, sender);//TODO: move to clusterconfig
-    // assert |honestReplicas| >= 1;
-    // var honestSenders1 := senders1 * honestReplicas;
-    // var honestSenders2 := senders2 * honestReplicas;
-
-    // assert |honestSenders1| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
-    // assert |honestSenders2| >= c.clusterConfig.AgreementQuorum() - c.clusterConfig.F();
-
-    // if(honestSenders1 * honestSenders2 == {}) {
-    //   assert |honestSenders1 + honestSenders2| == |honestSenders1| + |honestSenders2|; // Doc: Follows from contradiction hypothesis
-    //   assert honestSenders1 + honestSenders2 <= honestReplicas;
-    //   assert |honestSenders1 + honestSenders2| <= |honestReplicas|;
-    //   assert |honestReplicas| < |honestSenders1| + |honestSenders2|;
-    //   assert |honestSenders1| + |honestSenders2| <= |honestReplicas|;
-      
-    //   assert false; // Proof by contradiction.
-    // }
-    // //var result:HostIdentifiers.HostId :| (honestSenders1 * honestSenders2);
-    // var result :| result in (honestSenders1 * honestSenders2);
-    // common := result;
-
     var f := c.clusterConfig.F();
     var n := c.clusterConfig.N();
 
@@ -326,8 +348,8 @@ module Proof {
         < |senders1| + |senders2| - |senders1*senders2|;
         == |senders1 + senders2|; 
         <= {
+          assert senders1 + senders2 <= getAllReplicas(c);
           Library.SubsetCardinality(senders1 + senders2, getAllReplicas(c));
-          assert senders1 + senders2 < getAllReplicas(c);
         }
         n;
       }
@@ -396,7 +418,7 @@ module Proof {
 
   lemma QuorumOfPreparesInNetworkMonotonic(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step)
     requires NextStep(c, v, v', step)
-    requires c.IsReplica(step.id)
+    requires c.clusterConfig.IsReplica(step.id)
     requires var h_c := c.hosts[step.id].replicaConstants;
              var h_v := v.hosts[step.id].replicaVariables;
              var h_v' := v'.hosts[step.id].replicaVariables;
@@ -503,7 +525,7 @@ module Proof {
       }
     }
 
-    var prepares' := sentPreparesForSeqID(c, v, new_msg.view, new_msg.seqID, new_msg.clientOp);
+    var prepares' := sentPreparesForSeqID(c, v', new_msg.view, new_msg.seqID, new_msg.clientOp);
     Library.SubsetCardinality(prepares, prepares');
 
     assert forall sender | sender in h_v.workingWindow.preparesRcvd[new_msg.seqID]
@@ -587,7 +609,7 @@ module Proof {
   {
     && Inv(c, v)
     && NextStep(c, v, v', step)
-    && c.IsClient(step.id)
+    && c.clusterConfig.IsClient(step.id)
     && var h_c := c.hosts[step.id].clientConstants;
     && var h_v := v.hosts[step.id].clientVariables;
     && var h_v' := v'.hosts[step.id].clientVariables;
@@ -766,7 +788,7 @@ module Proof {
 
     ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
 
-    if (c.IsReplica(step.id))
+    if (c.clusterConfig.IsReplica(step.id))
     {
       var h_c := c.hosts[step.id].replicaConstants;
       var h_v := v.hosts[step.id].replicaVariables;
@@ -797,7 +819,7 @@ module Proof {
         case DoCommitStep(seqID) => { 
           DoCommitStepPreservesInv(c, v, v', step, h_step);
         }
-    } else if (c.IsClient(step.id)) {
+    } else if (c.clusterConfig.IsClient(step.id)) {
 
       var h_c := c.hosts[step.id].clientConstants;
       var h_v := v.hosts[step.id].clientVariables;
