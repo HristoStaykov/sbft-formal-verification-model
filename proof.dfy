@@ -271,9 +271,10 @@ module Proof {
     var senders2 := h_v.workingWindow.preparesRcvd[h_step.seqID].Keys;
     assert |senders2| >= c.clusterConfig.AgreementQuorum();
 
-    forall prepare | prepare in prepares1 ensures prepare.sender in getAllReplicas(c) {
-      
+    forall sender | sender in senders2 ensures sender in getAllReplicas(c) {
+      assert c.clusterConfig.IsReplica(sender);
     }
+
     assert senders2 <= getAllReplicas(c);
     var equivocatingHonestSender := FindQuorumIntersection(c, senders1, senders2);
     var equivocatingPrepare1 := Messages.Prepare(equivocatingHonestSender, msg1.view,
@@ -307,19 +308,23 @@ module Proof {
     }
   }
 
-  function GetKReplicas(k:nat) : (hosts:set<HostIdentifiers.HostId>)
+  function GetKReplicas(c:Constants, k:nat) : (hosts:set<HostIdentifiers.HostId>)
+    requires c.WF()
+    requires k <= c.clusterConfig.N()
     ensures |hosts| == k
-    ensures forall host | host in hosts :: 0 <= host < k
+    ensures forall host :: host in hosts <==> 0 <= host < k
+    ensures forall host | host in hosts :: c.clusterConfig.IsReplica(host)
   {
     if k == 0 then {}
-    else GetKReplicas(k-1) + {k - 1}
+    else GetKReplicas(c, k-1) + {k - 1}
   }
 
   function getAllReplicas(c: Constants) : (hostsSet:set<HostIdentifiers.HostId>)
     requires c.WF()
     ensures |hostsSet| == c.clusterConfig.N()
+    ensures forall host :: host in hostsSet <==> c.clusterConfig.IsReplica(host)
   {
-    GetKReplicas(c.clusterConfig.N())
+    GetKReplicas(c, c.clusterConfig.N())
   }
 
   lemma FindQuorumIntersection(c: Constants, senders1:set<HostIdentifiers.HostId>, senders2:set<HostIdentifiers.HostId>) 
