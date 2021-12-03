@@ -16,13 +16,17 @@ module Replica {
   import ClusterConfig
                      
   type PrepareProofSet = map<HostId, Message> 
-  predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet) {
+  predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet)
+    requires c.WF()
+  {
       && forall x | x in ps :: && ps[x].Prepare? 
                                && c.clusterConfig.IsReplica(ps[x].sender)
   }
 
   type CommitProofSet = map<HostId, Message>
-  predicate CommitProofSetWF(c:Constants, cs:CommitProofSet) {
+  predicate CommitProofSetWF(c:Constants, cs:CommitProofSet)
+    requires c.WF()
+  {
       && forall x | x in cs :: && cs[x].Commit?
                                && c.clusterConfig.IsReplica(cs[x].sender)
   }
@@ -44,6 +48,7 @@ module Replica {
     commitsRcvd:imap<SequenceID, CommitProofSet>
   ) {
     predicate WF(c:Constants)
+      requires c.WF()
     {
       && FullImap(committedClientOperations)
       && FullImap(preparesRcvd)
