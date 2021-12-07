@@ -237,11 +237,6 @@ module Proof {
     //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
   }
 
-  predicate NoNewCommits(c: Constants, v:Variables, v':Variables)
-  {
-    && (forall msg | msg in v'.network.sentMsgs && msg.Commit? :: msg in v.network.sentMsgs)
-  }
-
   lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step,
                             msg1:Messages.Message, msg2:Messages.Message)
     requires Inv(c, v)
@@ -258,7 +253,6 @@ module Proof {
     requires IsHonestReplica(c, msg2.sender)
     ensures msg1.clientOp == msg2.clientOp
   {
-    //h_step:Replica.Step
     var prepares1 := sentPreparesForSeqID(c, v, msg1.view, msg1.seqID, msg1.clientOp);
     var senders1 := sendersOf(prepares1);
     assert |senders1| >= c.clusterConfig.AgreementQuorum();
@@ -271,41 +265,7 @@ module Proof {
     var senders2 := h_v.workingWindow.preparesRcvd[h_step.seqID].Keys;
     assert |senders2| >= c.clusterConfig.AgreementQuorum();
 
-    forall sender | sender in senders2 ensures sender in getAllReplicas(c) {
-      assert c.clusterConfig.IsReplica(sender);
-    }
-
-    assert senders2 <= getAllReplicas(c);
     var equivocatingHonestSender := FindQuorumIntersection(c, senders1, senders2);
-    var equivocatingPrepare1 := Messages.Prepare(equivocatingHonestSender, msg1.view,
-                                        msg1.seqID, msg1.clientOp);
-    var equivocatingPrepare2 := Messages.Prepare(equivocatingHonestSender, msg2.view,
-                                        msg2.seqID, msg2.clientOp);
-    assert equivocatingPrepare1 in v.network.sentMsgs;
-    assert equivocatingPrepare1.Prepare?;
-    assert equivocatingPrepare1.seqID == msg1.seqID;
-    assert equivocatingPrepare1.clientOp == msg1.clientOp;
-
-    assert equivocatingPrepare1 in prepares1;
-    assert equivocatingPrepare1 in v.network.sentMsgs;
-
-    assert equivocatingPrepare2 == h_v.workingWindow.preparesRcvd[h_step.seqID][equivocatingHonestSender];
-    // by {
-      // var wwMsg := h_v.workingWindow.preparesRcvd[h_step.seqID][equivocatingHonestSender];
-      // assert equivocatingPrepare2.view == h_v.view;
-      // assert wwMsg.view == equivocatingPrepare2.view;
-      // assert wwMsg.clientOp == equivocatingPrepare2.clientOp;
-      // assert wwMsg.seqID == equivocatingPrepare2.seqID;
-      // assert wwMsg.sender == equivocatingPrepare2
-    // };
-
-    assert RecordedPreparesRecvdCameFromNetwork(c, v, step.id);
-
-    assert equivocatingPrepare2 in v.network.sentMsgs;
-
-    if(msg1.clientOp != msg2.clientOp) {
-
-    }
   }
 
   function GetKReplicas(c:Constants, k:nat) : (hosts:set<HostIdentifiers.HostId>)
@@ -349,7 +309,6 @@ module Proof {
       calc {
         n;
         == (3 * f) + 1;
-        == 2*f+1 + 2*f+1 - (f+1);
         < |senders1| + |senders2| - |senders1*senders2|;
         == |senders1 + senders2|; 
         <= {
@@ -361,7 +320,6 @@ module Proof {
       assert false; // Proof by contradiction.
     }
     assert f + 1 <= |commonSenders|;
-
 
     var honestReplicas := set sender | 0 <= sender < n && IsHonestReplica(c, sender);
     var commonHonest := commonSenders * honestReplicas;
@@ -475,94 +433,6 @@ module Proof {
     }
   }
 
-  lemma SendersAreAlwaysFewerThanMessages(msgs:set<Messages.Message>)
-    ensures |sendersOf(msgs)| <= |msgs|
-  {
-    if |msgs| > 0 {
-      var sender :| sender in sendersOf(msgs);
-      var msgsFromSender := set msg | && msg in msgs 
-                                      && msg.sender == sender;
-      var subMsgs := msgs - msgsFromSender;
-      SendersAreAlwaysFewerThanMessages(subMsgs);
-      Library.SubsetCardinality(sendersOf(subMsgs), sendersOf(msgs) - {sender});
-      assert sendersOf(msgs) - {sender} == sendersOf(subMsgs); // Trigger
-    }
-  }
-
-  lemma WlogCommitSingleHostConsistency(c: Constants, v:Variables, v':Variables, step:Step, h_step:Replica.Step,
-                            old_msg:Messages.Message, new_msg:Messages.Message)
-    requires NextStep(c, v, v', step)
-    requires IsHonestReplica(c, step.id)
-    requires  var h_c := c.hosts[step.id].replicaConstants;
-              var h_v := v.hosts[step.id].replicaVariables;
-              var h_v' := v'.hosts[step.id].replicaVariables;
-              && Replica.NextStep(h_c, h_v, h_v', step.msgOps, h_step)
-              && h_step.SendCommitStep?
-              && Replica.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
-    requires old_msg in v.network.sentMsgs && old_msg in v'.network.sentMsgs
-    requires new_msg !in v.network.sentMsgs && new_msg in v'.network.sentMsgs
-    requires && old_msg.Commit?
-             && new_msg.Commit?
-             && old_msg.seqID == new_msg.seqID
-             && old_msg.view == new_msg.view
-             && old_msg.sender == new_msg.sender
-
-    requires Inv(c, v)
-    ensures old_msg == new_msg
-  {
-    var h_c := c.hosts[step.id].replicaConstants;
-    var h_v := v.hosts[step.id].replicaVariables;
-    var h_v' := v'.hosts[step.id].replicaVariables;
-    QuorumOfPreparesInNetworkMonotonic(c, v, v', step, h_step);
-    assert QuorumOfPreparesInNetwork(c, v', old_msg.view, old_msg.seqID, old_msg.clientOp);
-    assert Replica.QuorumOfPrepares(h_c, h_v, new_msg.seqID);
-    var recordedPreparesSenders := h_v.workingWindow.preparesRcvd[new_msg.seqID].Keys;
-    assert |recordedPreparesSenders| >= c.clusterConfig.AgreementQuorum();
-    var prepares := sentPreparesForSeqID(c, v, new_msg.view, new_msg.seqID, new_msg.clientOp);
-    assert recordedPreparesSenders <= sendersOf(prepares) by {
-      forall sender | sender in recordedPreparesSenders ensures sender in sendersOf(prepares) {
-        var msg := h_v.workingWindow.preparesRcvd[new_msg.seqID][sender];
-        assert msg.sender == sender;
-        assert msg.seqID == new_msg.seqID;
-        assert msg.clientOp == new_msg.clientOp;
-        assert msg in v.network.sentMsgs;
-        assert msg in prepares;
-      }
-    }
-
-    var prepares' := sentPreparesForSeqID(c, v', new_msg.view, new_msg.seqID, new_msg.clientOp);
-    Library.SubsetCardinality(prepares, prepares');
-
-    assert forall sender | sender in h_v.workingWindow.preparesRcvd[new_msg.seqID]
-                         :: h_v.workingWindow.preparesRcvd[new_msg.seqID][sender].clientOp == new_msg.clientOp;
-
-    assert h_v.workingWindow.prePreparesRcvd[new_msg.seqID].value.clientOp == new_msg.clientOp;
-
-    assert Replica.QuorumOfPrepares(h_c, h_v, old_msg.seqID);
-
-    assert h_v.workingWindow.prePreparesRcvd[old_msg.seqID].value.clientOp == old_msg.clientOp by {
-      reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
-    }
-
-    assert forall sender | sender in h_v.workingWindow.preparesRcvd[old_msg.seqID]
-                         :: h_v.workingWindow.preparesRcvd[old_msg.seqID][sender].clientOp == old_msg.clientOp;
-
-    Library.SubsetCardinality(recordedPreparesSenders, sendersOf(prepares));
-    assert |sendersOf(prepares)| >= c.clusterConfig.AgreementQuorum();
-    SendersAreAlwaysFewerThanMessages(prepares);
-    assert |prepares| >= |sendersOf(prepares)|;
-    assert |prepares| >= c.clusterConfig.AgreementQuorum();
-    assert QuorumOfPreparesInNetwork(c, v', new_msg.view, new_msg.seqID, new_msg.clientOp);
-
-    assert old_msg.seqID == new_msg.seqID;
-    assert old_msg.Commit? && new_msg.Commit?;
-    assert old_msg.sender == new_msg.sender;
-    assert old_msg.view == new_msg.view;
-    assert old_msg.clientOp == new_msg.clientOp;
-
-    assert old_msg == new_msg;
-  }
-
   predicate SentCommitIsEnabled(c: Constants, v:Variables, v':Variables,
                                 step:Step, h_step:Replica.Step)
   {
@@ -576,38 +446,6 @@ module Proof {
     && h_step.SendCommitStep?
     && Replica.SendCommit(h_c, h_v, h_v', step.msgOps, h_step.seqID)
   }
-
-  // lemma HonestReplicasLockOnCommitForGivenViewLemma(c: Constants, v:Variables, v':Variables, 
-  //                                                   step:Step, h_step:Replica.Step)
-  //   requires SentCommitIsEnabled(c, v, v', step, h_step)
-  //   ensures HonestReplicasLockOnCommitForGivenView(c, v')
-  // {
-  //   reveal_HonestReplicasLockOnCommitForGivenView();
-  //   forall msg1, msg2 | 
-  //     && msg1 in v'.network.sentMsgs 
-  //     && msg2 in v'.network.sentMsgs 
-  //     && msg1.Commit?
-  //     && msg2.Commit?
-  //     && msg1.view == msg2.view
-  //     && msg1.seqID == msg2.seqID
-  //     && msg1.sender == msg2.sender
-  //     && IsHonestReplica(c, msg1.sender)
-  //     ensures msg1 == msg2 {
-  //       if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-  //         assert msg1 == msg2;
-  //       } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-  //         assert msg1 == msg2;
-  //       } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-  //         WlogCommitSingleHostConsistency(c, v, v', step, h_step, msg1, msg2);
-  //         assert msg1 == msg2;
-  //       } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-  //         WlogCommitSingleHostConsistency(c, v, v', step, h_step, msg2, msg1);
-  //         assert msg1 == msg2;
-  //       } else {
-  //         assert false;
-  //       }
-  //     }
-  // }
 
   predicate SendClientOperationIsEnabled(c: Constants, v:Variables, v':Variables,
                                          step:Step, h_step:Client.Step)
@@ -769,19 +607,6 @@ module Proof {
     ensures Inv(c, v')
   {
     CommitMsgStability(c, v, v', step);
-    // forall commitMsg | && commitMsg in v'.network.sentMsgs 
-    //                    && commitMsg.Commit? 
-    //                    && IsHonestReplica(c, commitMsg.sender)
-    //   ensures QuorumOfPreparesInNetwork(c, v', commitMsg.seqID, commitMsg.clientOp)
-    //   {
-    //     if(commitMsg !in v.network.sentMsgs) {
-    //       var h_v := v.hosts[step.id].replicaVariables;
-    //       var senders := h_v.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
-    //       var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.seqID, commitMsg.clientOp));
-    //       assert forall sender | sender in senders :: sender in senders'; //Trigger.
-    //       Library.SubsetCardinality(senders, senders');
-    //     }
-    //   }
   }
 
   lemma InvariantNext(c: Constants, v:Variables, v':Variables)
