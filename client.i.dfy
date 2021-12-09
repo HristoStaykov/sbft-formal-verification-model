@@ -57,10 +57,10 @@ module Client {
     && msgOps.IsSend()
     && PendingRequests(c,v) == 0
     && var msg := msgOps.send.value;
-    && msg.ClientRequest?
+    && msg.payload.ClientRequest?
     && msg.sender == c.myId
-    && msg.clientOp.sender == c.myId
-    && msg.clientOp.timestamp == v.lastRequestTimestamp + 1
+    && msg.payload.clientOp.sender == c.myId
+    && msg.payload.clientOp.timestamp == v.lastRequestTimestamp + 1
     && v' == v.(lastRequestTimestamp := v.lastRequestTimestamp + 1)
   }
   
