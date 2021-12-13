@@ -75,16 +75,25 @@ module Replica {
     }
   }
 
+  datatype ViewChangeMsgs = ViewChangeMsgs(msgs:map<HostId, Message>) {
+    predicate WF() {
+      && (forall x | x in msgs :: && msgs[x].payload.ViewChange?
+                                  && msgs[x].sender == x
+                                  && c.clusterConfig.IsReplica(msgs[x].sender))
+    }
+  }
 
   datatype Variables = Variables(
-    view:nat,
+    view:ViewNum,
     viewIsActive:bool,
-    workingWindow:WorkingWindow
+    workingWindow:WorkingWindow,
+    viewChangeMsgsForHigherView:ViewChangeMsgs
   ) {
     predicate WF(c:Constants)
     {
       && c.WF()
       && workingWindow.WF(c)
+      && viewChangeMsgsForHigherView.WF()
     }
   }
 
@@ -246,6 +255,27 @@ module Replica {
     && assert msgOps.send.value.payload.Commit?; true
 
     && v' == v
+  }
+
+  predicate LeaveView(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
+    && v.WF(c)
+    && msgOps.recv.None? // add to msgOps no send/recv (internal operations)
+    && msgOps.send.None?
+    && var newView := v.view + 1;
+    && v' == v.(viewIsActive := false)
+              .(view := newView)
+              .(viewChangeMsgsForHigherView := v.viewChangeMsgsForHigherView[c.myId := ])
+    && (forall sequenceID :: sequenceID in msg.certificates <==> 
+           && )
+  }
+
+  predicate SendViewChange(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && v.WF(c)
+    && msgOps.IsSend()
+    && var msg := msgOps.send.value;
+    && msg.payload.ViewChangeMsg?
+    && msg.payload.newView == newView
   }
   
   predicate Init(c:Constants, v:Variables) {

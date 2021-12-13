@@ -2,16 +2,30 @@ include "network.s.dfy"
 
 module Messages {
   import opened HostIdentifiers
+  import Network
 
   type SequenceID = nat
+  type ViewNum = nat
 
   datatype ClientOperation = ClientOperation(sender:HostId, timestamp:nat)
 
+  datatype PreparedCertificate = PreparedCertificate(prototype: Message, votes:set<Network.Message<Message>>) {
+    predicate valid() {
+      && prototype.Prepare?
+      && (forall v | v in votes :: v.payload == prototype) // messages have to be votes that match eachother by the prototype 
+      && (forall v1, v2 | && v1 in votes
+                          && v2 in votes
+                          && v1 != v2
+                            :: v1.sender != v2.sender) // unique senders
+    }
+  }
+
   // Define your Message datatype here.
-  datatype Message = | PrePrepare(view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | Prepare(view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | Commit(view:nat, seqID:SequenceID, clientOp:ClientOperation)
+  datatype Message = | PrePrepare(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
+                     | Prepare(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
+                     | Commit(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
                      | ClientRequest(clientOp:ClientOperation)
+                     | ViewChangeMsg(newView:ViewNum, certificates:map<SequenceID, PreparedCertificate>) // omitting last stable because we don't have checkpointing yet.
 
   // ToDo: ClientReply
 }
