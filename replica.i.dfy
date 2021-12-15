@@ -75,11 +75,12 @@ module Replica {
     }
   }
 
-  datatype ViewChangeMsgs = ViewChangeMsgs(msgs:map<HostId, Message>) {
-    predicate WF() {
-      && (forall x | x in msgs :: && msgs[x].payload.ViewChange?
-                                  && msgs[x].sender == x
-                                  && c.clusterConfig.IsReplica(msgs[x].sender))
+  datatype ViewChangeMsgs = ViewChangeMsgs(msgs:map<ViewNum, map<HostId, Message>>) {
+    predicate WF(c:Constants) {
+      && (forall view | view in msgs ::
+           (forall sender | sender in msgs[view] :: && msgs[view][sender].ViewChangeMsg?
+                                                    && msgs[view][sender].view == view
+                                                    && c.clusterConfig.IsReplica(sender)))
     }
   }
 
@@ -93,7 +94,7 @@ module Replica {
     {
       && c.WF()
       && workingWindow.WF(c)
-      && viewChangeMsgsForHigherView.WF()
+      && viewChangeMsgsRecvd.WF(c)
     }
   }
 
@@ -105,6 +106,26 @@ module Replica {
 
   predicate HaveSufficientVCMsgsToMoveTo(c:Constants, v:Variables, newView:ViewNum) {
     false
+  }
+
+  predicate ViewIsActive(c:Constants, v:Variables) {
+    && var vcMsgsForHigherView := set msg | (forall view | view in v.viewChangeMsgsRecvd.msgs ::
+                                              (forall sender | sender in v.viewChangeMsgsRecvd.msgs[view] ::
+                                                && var vcMsg := v.viewChangeMsgsRecvd.msgs[view][sender];
+                                                && vcMsg.ViewChangeMsg? 
+                                                && vcMsg.view > v.view
+                                                && msg == vcMsg));
+    && var vcMsgsForMyView := set msg | (forall sender | sender in v.viewChangeMsgsRecvd.msgs[v.view] ::
+                                            && var vcMsg := v.viewChangeMsgsRecvd.msgs[v.view][sender];
+                                            && vcMsg.ViewChangeMsg? 
+                                            && vcMsg.view == v.view
+                                            && msg == vcMsg);
+    && var myVCMsg := c.myId in v.viewChangeMsgsRecvd.msgs[v.view];
+
+    && ( || |vcMsgsForHigherView| < c.clusterConfig.ByzantineSafeQuorum() 
+         || (myVCMsg && |vcMsgsForMyView| < c.clusterConfig.AgreementQuorum()))
+    // TODO: take in account NewViewMsg once we have it in the model
+
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
@@ -261,39 +282,39 @@ module Replica {
     && v' == v
   }
 
-  predicate LeaveView(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, newView:ViewNum) {
-    && v.WF(c)
-    && msgOps.recv.None? // add to msgOps no send/recv (internal operations)
-    && msgOps.send.None?
-    // We can only leave a view we have collected at least 2F+1 View 
-    // Change messages for in viewChangeMsgsRecvd or View is 0.
-    && (|| newView == v.view + 1
-        || HaveSufficientVCMsgsToMoveTo(c, v, newView))
-    && var vcMsg := ViewChangeMsg(newView, ExtractCertificatesFromWorkingWindow(c, v))
-    && (forall seqID :: seqID in msg.certificates ==> 
-           && msg.certificates[seqID].valid() 
-           && |msg.certificates[seqID]| >= c.clusterConfig.AgreementQuorum())
-    && v' == v.(viewIsActive := false)
-              .(view := newView)
-              .(viewChangeMsgsForHigherView := v.viewChangeMsgsForHigherView[c.myId := vcMsg])
-  }
+  // predicate LeaveView(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, newView:ViewNum) {
+  //   && v.WF(c)
+  //   && msgOps.recv.None? // add to msgOps no send/recv (internal operations)
+  //   && msgOps.send.None?
+  //   // We can only leave a view we have collected at least 2F+1 View 
+  //   // Change messages for in viewChangeMsgsRecvd or View is 0.
+  //   && (|| newView == v.view + 1
+  //       || HaveSufficientVCMsgsToMoveTo(c, v, newView))
+  //   && var vcMsg := ViewChangeMsg(newView, ExtractCertificatesFromWorkingWindow(c, v));
+  //   && (forall seqID :: seqID in msg.certificates ==> 
+  //          && msg.certificates[seqID].valid() 
+  //          && |msg.certificates[seqID]| >= c.clusterConfig.AgreementQuorum())
+  //   && v' == v.(viewIsActive := false)
+  //             .(view := newView)
+  //             .(viewChangeMsgsForHigherView := v.viewChangeMsgsForHigherView[c.myId := vcMsg])
+  // }
 
-  function ExtractCertificateForSeqID(c:Constants, v:Variables, seqID:SequenceID) : Option<PreparedCertificate>
-    requires v.WF(c)
-  {
-    if |c.workingWindow.preparesRcvd[seqID].Keys| == 0 
-    then None
-    else var prototype :|
-  }
+  // function ExtractCertificateForSeqID(c:Constants, v:Variables, seqID:SequenceID) : Option<PreparedCertificate>
+  //   requires v.WF(c)
+  // {
+  //   if |c.workingWindow.preparesRcvd[seqID].Keys| == 0 
+  //   then None
+  //   else var prototype :|
+  // }
 
-  predicate SendViewChange(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
-  {
-    && v.WF(c)
-    && msgOps.IsSend()
-    && var msg := msgOps.send.value;
-    && msg.payload.ViewChangeMsg?
-    && msg.payload.newView == newView
-  }
+  // predicate SendViewChange(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  // {
+  //   && v.WF(c)
+  //   && msgOps.IsSend()
+  //   && var msg := msgOps.send.value;
+  //   && msg.payload.ViewChangeMsg?
+  //   && msg.payload.newView == newView
+  // }
   
   predicate Init(c:Constants, v:Variables) {
     && v.view == 0
