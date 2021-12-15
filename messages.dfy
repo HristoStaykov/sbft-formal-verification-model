@@ -9,10 +9,17 @@ module Messages {
 
   datatype ClientOperation = ClientOperation(sender:HostId, timestamp:nat)
 
-  datatype PreparedCertificate = PreparedCertificate(prototype: Message, votes:set<Network.Message<Message>>) {
+  datatype PreparedCertificate = PreparedCertificate(votes:set<Network.Message<Message>>) {
+    function prototype() : Message 
+      requires |votes| > 0
+    {
+      var prot :| prot in votes;
+      prot.payload
+    }
     predicate valid() {
-      && prototype.Prepare?
-      && (forall v | v in votes :: v.payload == prototype) // messages have to be votes that match eachother by the prototype 
+      && |votes| > 0
+      && prototype().Prepare?
+      && (forall v | v in votes :: v.payload == prototype()) // messages have to be votes that match eachother by the prototype 
       && (forall v1, v2 | && v1 in votes
                           && v2 in votes
                           && v1 != v2

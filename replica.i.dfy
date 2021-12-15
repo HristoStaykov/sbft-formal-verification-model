@@ -85,9 +85,9 @@ module Replica {
 
   datatype Variables = Variables(
     view:ViewNum,
-    viewIsActive:bool,
+    viewIsActive:bool, //TODO: replace with predicates.
     workingWindow:WorkingWindow,
-    viewChangeMsgsForHigherView:ViewChangeMsgs
+    viewChangeMsgsRecvd:ViewChangeMsgs
   ) {
     predicate WF(c:Constants)
     {
@@ -101,6 +101,10 @@ module Replica {
     requires c.WF()
   {
     v.view % c.clusterConfig.N()
+  }
+
+  predicate HaveSufficientVCMsgsToMoveTo(c:Constants, v:Variables, newView:ViewNum) {
+    false
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
@@ -257,16 +261,29 @@ module Replica {
     && v' == v
   }
 
-  predicate LeaveView(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
+  predicate LeaveView(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, newView:ViewNum) {
     && v.WF(c)
     && msgOps.recv.None? // add to msgOps no send/recv (internal operations)
     && msgOps.send.None?
-    && var newView := v.view + 1;
+    // We can only leave a view we have collected at least 2F+1 View 
+    // Change messages for in viewChangeMsgsRecvd or View is 0.
+    && (|| newView == v.view + 1
+        || HaveSufficientVCMsgsToMoveTo(c, v, newView))
+    && var vcMsg := ViewChangeMsg(newView, ExtractCertificatesFromWorkingWindow(c, v))
+    && (forall seqID :: seqID in msg.certificates ==> 
+           && msg.certificates[seqID].valid() 
+           && |msg.certificates[seqID]| >= c.clusterConfig.AgreementQuorum())
     && v' == v.(viewIsActive := false)
               .(view := newView)
-              .(viewChangeMsgsForHigherView := v.viewChangeMsgsForHigherView[c.myId := ])
-    && (forall sequenceID :: sequenceID in msg.certificates <==> 
-           && )
+              .(viewChangeMsgsForHigherView := v.viewChangeMsgsForHigherView[c.myId := vcMsg])
+  }
+
+  function ExtractCertificateForSeqID(c:Constants, v:Variables, seqID:SequenceID) : Option<PreparedCertificate>
+    requires v.WF(c)
+  {
+    if |c.workingWindow.preparesRcvd[seqID].Keys| == 0 
+    then None
+    else var prototype :|
   }
 
   predicate SendViewChange(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
