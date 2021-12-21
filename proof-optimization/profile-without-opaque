@@ -1,0 +1,34 @@
+/home/jonh/veribetrfs-concurrency/.dafny/dafny/Binaries/Dafny /timeLimit:20 /proc:*ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares /proverOpt:O:smt.qi.profile=true /proverOpt:O:smt.qi.profile_freq=1000 proof.dfy
+
+Dafny program verifier finished with 1 verified, 0 errors
+       max 
+     13000 cast:U_2_bool
+     13000 funType:MapType0Select
+     10000 proofdfy.108:16
+     10000 proofdfy.167:16
+      8000 DafnyPreludebpl.223:15
+      7000 funType:$Unbox
+      6000 DafnyPreludebpl.184:18
+      5000 DafnyPreludebpl.141:18
+      3000 DafnyPreludebpl.1380:21
+      3000 nofile.1:501
+      3000 unknown.0:0
+      2000 DafnyPreludebpl.1296:21
+      2000 DafnyPreludebpl.1299:21
+      2000 DafnyPreludebpl.1302:21
+      2000 DafnyPreludebpl.1306:21
+      2000 DafnyPreludebpl.1309:21
+      2000 DafnyPreludebpl.1312:21
+      2000 DafnyPreludebpl.219:15
+      2000 DafnyPreludebpl.279:15
+      2000 DafnyPreludebpl.287:15
+      2000 DafnyPreludebpl.295:15
+      2000 DafnyPreludebpl.684:18
+      2000 funType:IMap#Domain
+      2000 funType:IMap#Items
+      2000 funType:IMap#Values
+      2000 funType:int_2_U
+      2000 proofdfy.68:16
+      2000 proofdfy.81:16
+      2000 proofdfy.94:16
+      2000 typeInv:U_2_int

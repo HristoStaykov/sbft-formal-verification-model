@@ -1,0 +1,41 @@
+I started by branching signature_abstraction_mechanism.
+
+trace-with-opaque: per-method-timings with Hristo's existing opaques.
+Total times:
+real	1m2.865s
+user	1m3.956s
+sys	0m0.476s
+
+
+trace-without-opaque: {:opaque}s removed.
+real	1m25.174s
+user	1m26.234s
+sys	0m0.571s
+
+
+That's actually not that bad. Worst offender: ProofEveryCommitMsgIsSupportedByAQuorumOfPrepare
+~/veribetrfs-concurrency/tools/dafny-profile.py 20 "*ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares" proof.dfy 
+See profile-without-opaque
+
+Introducing getters broke the ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares proof (not that shocked). But it didn't help at all with perf.
+I tried opaquing the map-select getters at the bottom (where [] happens),
+and that didn't help either.
+
+Current conjecture:
+Getters weren't really the bottleneck, because we moved the triggers from
+
+   {v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID], c.clusterConfig.IsReplica(sender)}, {seqID in v.hosts[observer].replicaVariables.workingWindow.preparesRcvd, c.clusterConfig.IsReplica(sender)}
+
+to:
+
+   {PreparesRcvdFrom(c, v, observer, seqID, sender)}, {PreparesRcvd(c, v, observer, seqID), c.clusterConfig.IsReplica(sender)}, {seqID in PreparesRcvdMap(c, v, observer), c.clusterConfig.IsReplica(sender)}
+
+...that is, they were actually rather specific before. My theory had
+been that Z3 was swapping in seqId for replicaIdx and sender and such,
+but these triggers wouldn't do that.
+
+If there is such an explosion due to MapType0Select, it's not originating
+at the quantifiers that I'm protecting with getters. It's coming from
+inside the original definitions themselves. I don't know how to
+measure that nor how to protect against it.
+

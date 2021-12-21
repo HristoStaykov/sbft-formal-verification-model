@@ -1,0 +1,422 @@
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(14,11): Info: auto-accumulator tail recursive
+/home/jonh/sbft-formal-verification-model/proof.dfy(379,6): Info: ==
+/home/jonh/sbft-formal-verification-model/proof.dfy(341,11): Info: auto-accumulator tail recursive
+/home/jonh/sbft-formal-verification-model/network.s.dfy(20,4): Info: Selected triggers: {ValidHostId(hostid)}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(30,12): Info: Selected triggers: {theSets[idx]}
+ Rejected triggers: {theSets[idx] <= UnionSeqOfSets(theSets)} (more specific than {theSets[idx]})
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(35,12): Info: Selected triggers: {member in UnionSeqOfSets(theSets)}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(36,10): Info: Selected triggers: {theSets[idx]}
+ Rejected triggers: {member in theSets[idx]} (more specific than {theSets[idx]})
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(55,12): Info: Selected triggers:
+   {k in m'}, {k in m}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(56,12): Info: Selected triggers:
+   {k in m}, {k in m'}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(57,12): Info: Selected triggers:
+   {m[j]}, {m'[j]}, {j in m'}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(61,13): Info: Selected triggers:
+   {m[j]}, {j in m}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(77,4): Info: Selected triggers: {k in im}
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(57,10): Info: Selected triggers:
+   {preparesRcvd[seqID]}, {seqID in preparesRcvd}
+ Rejected triggers: {PrepareProofSetWF(c, preparesRcvd[seqID])} (more specific than {preparesRcvd[seqID]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(58,10): Info: Selected triggers:
+   {commitsRcvd[seqID]}, {seqID in commitsRcvd}
+ Rejected triggers: {CommitProofSetWF(c, commitsRcvd[seqID])} (more specific than {commitsRcvd[seqID]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(22,9): Info: Selected triggers:
+   {ps[x]}, {x in ps}
+ Rejected triggers:
+   {c.clusterConfig.IsReplica(ps[x].sender)} (more specific than {ps[x].sender}, {ps[x]})
+   {ps[x].sender} (more specific than {ps[x]})
+   {ps[x].payload.Prepare?} (more specific than {ps[x].payload}, {ps[x]})
+   {ps[x].payload} (more specific than {ps[x]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(30,9): Info: Selected triggers:
+   {cs[x]}, {x in cs}
+ Rejected triggers:
+   {c.clusterConfig.IsReplica(cs[x].sender)} (more specific than {cs[x].sender}, {cs[x]})
+   {cs[x].sender} (more specific than {cs[x]})
+   {cs[x].payload.Commit?} (more specific than {cs[x].payload}, {cs[x]})
+   {cs[x].payload} (more specific than {cs[x]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(37,8): Info: Selected triggers:
+   {prePreparesRcvd[x]}, {x in prePreparesRcvd}
+ Rejected triggers:
+   {prePreparesRcvd[x].value.payload.PrePrepare?} (more specific than {prePreparesRcvd[x].value.payload}, {prePreparesRcvd[x].value}, {prePreparesRcvd[x]})
+   {prePreparesRcvd[x].value.payload} (more specific than {prePreparesRcvd[x].value}, {prePreparesRcvd[x]})
+   {prePreparesRcvd[x].value} (more specific than {prePreparesRcvd[x]})
+   {prePreparesRcvd[x].Some?} (more specific than {prePreparesRcvd[x]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(254,8): Info: Selected triggers:
+   {v.workingWindow.committedClientOperations[seqID]}, {seqID in v.workingWindow.committedClientOperations}
+ Rejected triggers: {v.workingWindow.committedClientOperations[seqID].None?} (more specific than {v.workingWindow.committedClientOperations[seqID]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(256,8): Info: Selected triggers:
+   {v.workingWindow.prePreparesRcvd[seqID]}, {seqID in v.workingWindow.prePreparesRcvd}
+ Rejected triggers: {v.workingWindow.prePreparesRcvd[seqID].None?} (more specific than {v.workingWindow.prePreparesRcvd[seqID]})
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(258,8): Info: Selected triggers:
+   {v.workingWindow.preparesRcvd[seqID]}, {seqID in v.workingWindow.preparesRcvd}
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(259,8): Info: Selected triggers:
+   {v.workingWindow.commitsRcvd[seqID]}, {seqID in v.workingWindow.commitsRcvd}
+/home/jonh/sbft-formal-verification-model/replica.i.dfy(287,4): Info: Selected triggers: {NextStep(c, v, v', msgOps, step)}
+/home/jonh/sbft-formal-verification-model/client.i.dfy(83,4): Info: Selected triggers: {NextStep(c, v, v', msgOps, step)}
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(33,10): Info: Selected triggers:
+   {Replica.Constants(id, clusterConfig)}, {hosts[id]}, {clusterConfig.IsReplica(id)}
+ Rejected triggers: {HostConstants.Replica(Replica.Constants(id, clusterConfig))} (more specific than {Replica.Constants(id, clusterConfig)})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(34,10): Info: Selected triggers:
+   {Client.Constants(id, clusterConfig)}, {hosts[id]}, {clusterConfig.IsClient(id)}
+ Rejected triggers: {HostConstants.Client(Client.Constants(id, clusterConfig))} (more specific than {Client.Constants(id, clusterConfig)})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(45,10): Info: Selected triggers:
+   {c.hosts[id]}, {hosts[id]}, {c.clusterConfig.IsReplica(id)}
+ Rejected triggers:
+   {hosts[id].replicaVariables.WF(c.hosts[id].replicaConstants)} (more specific than {c.hosts[id].replicaConstants}, {c.hosts[id]}, {hosts[id].replicaVariables}, {hosts[id]})
+   {c.hosts[id].replicaConstants} (more specific than {c.hosts[id]})
+   {hosts[id].replicaVariables} (more specific than {hosts[id]})
+   {hosts[id].Replica?} (more specific than {hosts[id]})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(46,10): Info: Selected triggers:
+   {c.hosts[id]}, {hosts[id]}, {c.clusterConfig.IsClient(id)}
+ Rejected triggers:
+   {hosts[id].clientVariables.WF(c.hosts[id].clientConstants)} (more specific than {c.hosts[id].clientConstants}, {c.hosts[id]}, {hosts[id].clientVariables}, {hosts[id]})
+   {c.hosts[id].clientConstants} (more specific than {c.hosts[id]})
+   {hosts[id].clientVariables} (more specific than {hosts[id]})
+   {hosts[id].Client?} (more specific than {hosts[id]})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(52,32): Info: Selected triggers:
+   {v.hosts[replicaID]}, {c.hosts[replicaID]}
+ Rejected triggers:
+   {Replica.QuorumOfPrepares(c.hosts[replicaID].replicaConstants, v.hosts[replicaID].replicaVariables, seqID)} (more specific than {v.hosts[replicaID].replicaVariables}, {v.hosts[replicaID]}, {c.hosts[replicaID].replicaConstants}, {c.hosts[replicaID]})
+   {v.hosts[replicaID].replicaVariables} (more specific than {v.hosts[replicaID]})
+   {c.hosts[replicaID].replicaConstants} (more specific than {c.hosts[replicaID]})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(62,8): Info: Selected triggers:
+   {v.hosts[id]}, {c.hosts[id]}, {c.clusterConfig.IsReplica(id)}
+ Rejected triggers:
+   {Init(c.hosts[id].replicaConstants, v.hosts[id].replicaVariables)} (more specific than {v.hosts[id].replicaVariables}, {v.hosts[id]}, {c.hosts[id].replicaConstants}, {c.hosts[id]})
+   {v.hosts[id].replicaVariables} (more specific than {v.hosts[id]})
+   {c.hosts[id].replicaConstants} (more specific than {c.hosts[id]})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(64,8): Info: Selected triggers:
+   {v.hosts[id]}, {c.hosts[id]}, {c.clusterConfig.IsClient(id)}
+ Rejected triggers:
+   {Init(c.hosts[id].clientConstants, v.hosts[id].clientVariables)} (more specific than {v.hosts[id].clientVariables}, {v.hosts[id]}, {c.hosts[id].clientConstants}, {c.hosts[id]})
+   {v.hosts[id].clientVariables} (more specific than {v.hosts[id]})
+   {c.hosts[id].clientConstants} (more specific than {c.hosts[id]})
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(90,8): Info: Selected triggers:
+   {v.hosts[other]}, {v'.hosts[other]}, {ValidHostId(other)}
+/home/jonh/sbft-formal-verification-model/distributed_system.s.dfy(95,4): Info: Selected triggers: {NextStep(c, v, v', step)}
+/home/jonh/sbft-formal-verification-model/proof.dfy(103,8): Info: Selected triggers: {PrepreparesRcvd(c, v, replicaIdx, seqID)}
+ Rejected triggers:
+   {PrepreparesRcvd(c, v, replicaIdx, seqID).value in v.network.sentMsgs} (more specific than {PrepreparesRcvd(c, v, replicaIdx, seqID).value}, {PrepreparesRcvd(c, v, replicaIdx, seqID)})
+   {PrepreparesRcvd(c, v, replicaIdx, seqID).value} (more specific than {PrepreparesRcvd(c, v, replicaIdx, seqID)})
+   {PrepreparesRcvd(c, v, replicaIdx, seqID).Some?} (more specific than {PrepreparesRcvd(c, v, replicaIdx, seqID)})
+/home/jonh/sbft-formal-verification-model/proof.dfy(113,8): Info: Selected triggers:
+   {PreparesRcvd(c, v, observer, seqID)[sender]}, {sender in PreparesRcvd(c, v, observer, seqID)}
+ Rejected triggers:
+   {PreparesRcvd(c, v, observer, seqID)[sender].payload.seqID} (more specific than {PreparesRcvd(c, v, observer, seqID)[sender].payload}, {PreparesRcvd(c, v, observer, seqID)[sender]})
+   {PreparesRcvd(c, v, observer, seqID)[sender].payload} (more specific than {PreparesRcvd(c, v, observer, seqID)[sender]})
+   {PreparesRcvd(c, v, observer, seqID)[sender].sender} (more specific than {PreparesRcvd(c, v, observer, seqID)[sender]})
+   {PreparesRcvd(c, v, observer, seqID)[sender] in v.network.sentMsgs} (more specific than {PreparesRcvd(c, v, observer, seqID)[sender]})
+/home/jonh/sbft-formal-verification-model/proof.dfy(123,8): Info: Selected triggers:
+   {RecordedPreparesRecvdCameFromNetwork(c, v, observer)}, {IsHonestReplica(c, observer)}
+/home/jonh/sbft-formal-verification-model/proof.dfy(130,8): Info: Selected triggers:
+   {commitMsg.sender}, {commitMsg.payload}, {commitMsg in v.network.sentMsgs}
+ Rejected triggers:
+   {QuorumOfPreparesInNetwork(c, v, commitMsg.payload.view, commitMsg.payload.seqID, commitMsg.payload.clientOp)} (more specific than {commitMsg.payload.clientOp}, {commitMsg.payload.seqID}, {commitMsg.payload.view}, {commitMsg.payload})
+   {commitMsg.payload.clientOp} (more specific than {commitMsg.payload})
+   {commitMsg.payload.seqID} (more specific than {commitMsg.payload})
+   {commitMsg.payload.view} (more specific than {commitMsg.payload})
+   {IsHonestReplica(c, commitMsg.sender)} (more specific than {commitMsg.sender})
+   {commitMsg.payload.Commit?} (more specific than {commitMsg.payload})
+/home/jonh/sbft-formal-verification-model/proof.dfy(139,8): Info: Selected triggers:
+   {msg2.sender, msg1.sender}, {msg2.sender, msg1.payload}, {msg2.sender, msg1 in v.network.sentMsgs}, {msg1.sender, msg2.payload}, {msg1.sender, msg2 in v.network.sentMsgs}, {msg2.payload, msg1.payload}, {msg2.payload, msg1 in v.network.sentMsgs}, {msg1.payload, msg2 in v.network.sentMsgs}, {msg2 in v.network.sentMsgs, msg1 in v.network.sentMsgs}
+ Rejected triggers:
+   {IsHonestReplica(c, msg1.sender), msg2.sender} (more specific than {msg2.sender, msg1.sender})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.seqID} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.seqID}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.view} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.view}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.Prepare?} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.Prepare?}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload} (more specific than {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2 in v.network.sentMsgs} (more specific than {msg1.sender, msg2 in v.network.sentMsgs})
+   {msg2.sender, msg1.payload.seqID} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.view} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.Prepare?} (more specific than {msg2.sender, msg1.payload})
+   {msg1.sender, msg2.payload.seqID} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.view} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.Prepare?} (more specific than {msg1.sender, msg2.payload})
+   {msg2.payload.seqID, msg1.payload.seqID} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.seqID, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.view} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.Prepare?} (more specific than {msg2.payload.seqID, msg1.payload}, {msg2.payload, msg1.payload.Prepare?}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.seqID, msg2.payload.view} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload.Prepare?} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.Prepare?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {msg2.payload.view, msg1.payload.view} (more specific than {msg2.payload.view, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload.Prepare?} (more specific than {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload.Prepare?}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.view, msg2.payload.Prepare?} (more specific than {msg1.payload.view, msg2.payload}, {msg2.payload.Prepare?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {msg2.payload.Prepare?, msg1.payload.Prepare?} (more specific than {msg2.payload.Prepare?, msg1.payload}, {msg2.payload, msg1.payload.Prepare?}, {msg2.payload, msg1.payload})
+   {msg2.payload.Prepare?, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.Prepare?, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg2.payload, msg1.payload.Prepare?} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.Prepare?, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+/home/jonh/sbft-formal-verification-model/proof.dfy(152,8): Info: Selected triggers:
+   {msg2.sender, msg1.sender}, {msg2.sender, msg1.payload}, {msg2.sender, msg1 in v.network.sentMsgs}, {msg1.sender, msg2.payload}, {msg1.sender, msg2 in v.network.sentMsgs}, {msg2.payload, msg1.payload}, {msg2.payload, msg1 in v.network.sentMsgs}, {msg1.payload, msg2 in v.network.sentMsgs}, {msg2 in v.network.sentMsgs, msg1 in v.network.sentMsgs}
+ Rejected triggers:
+   {IsHonestReplica(c, msg1.sender), msg2.sender} (more specific than {msg2.sender, msg1.sender})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.seqID} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.seqID}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.view} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.view}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.Commit?} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.Commit?}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload} (more specific than {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2 in v.network.sentMsgs} (more specific than {msg1.sender, msg2 in v.network.sentMsgs})
+   {msg2.sender, msg1.payload.seqID} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.view} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.Commit?} (more specific than {msg2.sender, msg1.payload})
+   {msg1.sender, msg2.payload.seqID} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.view} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.Commit?} (more specific than {msg1.sender, msg2.payload})
+   {msg2.payload.seqID, msg1.payload.seqID} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.seqID, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.view} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.Commit?} (more specific than {msg2.payload.seqID, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.seqID, msg2.payload.view} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload.Commit?} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {msg2.payload.view, msg1.payload.view} (more specific than {msg2.payload.view, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload.Commit?} (more specific than {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.view, msg2.payload.Commit?} (more specific than {msg1.payload.view, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {msg2.payload.Commit?, msg1.payload.Commit?} (more specific than {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.Commit?, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.Commit?, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg2.payload, msg1.payload.Commit?} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.Commit?, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+/home/jonh/sbft-formal-verification-model/proof.dfy(165,8): Info: Selected triggers:
+   {msg2.sender, msg1.sender}, {msg2.sender, msg1.payload}, {msg2.sender, msg1 in v.network.sentMsgs}, {msg1.sender, msg2.payload}, {msg1.sender, msg2 in v.network.sentMsgs}, {msg2.payload, msg1.payload}, {msg2.payload, msg1 in v.network.sentMsgs}, {msg1.payload, msg2 in v.network.sentMsgs}, {msg2 in v.network.sentMsgs, msg1 in v.network.sentMsgs}
+ Rejected triggers:
+   {msg2.payload.clientOp, msg1.payload.clientOp} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg1.payload.clientOp, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, IsHonestReplica(c, msg1.sender)} (more specific than {msg2.payload.clientOp, msg1.sender}, {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload})
+   {msg2.payload.clientOp, msg1.sender} (more specific than {msg1.sender, msg2.payload})
+   {msg2.payload.clientOp, msg1.payload.seqID} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg1.payload.seqID, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1.payload.view} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1.payload.Commit?} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.clientOp, IsHonestReplica(c, msg2.sender)} (more specific than {msg1.payload.clientOp, msg2.sender}, {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload})
+   {msg1.payload.clientOp, msg2.sender} (more specific than {msg2.sender, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload.seqID} (more specific than {msg1.payload.clientOp, msg2.payload}, {msg2.payload.seqID, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload.view} (more specific than {msg1.payload.clientOp, msg2.payload}, {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload.Commit?} (more specific than {msg1.payload.clientOp, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {IsHonestReplica(c, msg2.sender), IsHonestReplica(c, msg1.sender)} (more specific than {IsHonestReplica(c, msg2.sender), msg1.sender}, {msg2.sender, IsHonestReplica(c, msg1.sender)}, {msg2.sender, msg1.sender})
+   {IsHonestReplica(c, msg2.sender), msg1.sender} (more specific than {msg2.sender, msg1.sender})
+   {IsHonestReplica(c, msg2.sender), msg1.payload.seqID} (more specific than {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload.seqID}, {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1.payload.view} (more specific than {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload.view}, {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1.payload.Commit?} (more specific than {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload.Commit?}, {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1.payload} (more specific than {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1 in v.network.sentMsgs} (more specific than {msg2.sender, msg1 in v.network.sentMsgs})
+   {msg2.sender, IsHonestReplica(c, msg1.sender)} (more specific than {msg2.sender, msg1.sender})
+   {msg2.sender, msg1.payload.seqID} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.view} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.Commit?} (more specific than {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.seqID} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.seqID}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.view} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.view}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.Commit?} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.Commit?}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload} (more specific than {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2 in v.network.sentMsgs} (more specific than {msg1.sender, msg2 in v.network.sentMsgs})
+   {msg1.sender, msg2.payload.seqID} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.view} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.Commit?} (more specific than {msg1.sender, msg2.payload})
+   {msg2.payload.seqID, msg1.payload.seqID} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.seqID, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.view} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.Commit?} (more specific than {msg2.payload.seqID, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.seqID, msg2.payload.view} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload.Commit?} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {msg2.payload.view, msg1.payload.view} (more specific than {msg2.payload.view, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload.Commit?} (more specific than {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg1.payload.view, msg2.payload.Commit?} (more specific than {msg1.payload.view, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+   {msg2.payload.Commit?, msg1.payload.Commit?} (more specific than {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.Commit?, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.Commit?, msg1 in v.network.sentMsgs} (more specific than {msg2.payload, msg1 in v.network.sentMsgs})
+   {msg2.payload, msg1.payload.Commit?} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.Commit?, msg2 in v.network.sentMsgs} (more specific than {msg1.payload, msg2 in v.network.sentMsgs})
+/home/jonh/sbft-formal-verification-model/proof.dfy(179,8): Info: Selected triggers:
+   {c.clusterConfig.IsReplica(sender), PreparesRcvdMap(c, v, replicaIdx)[seqID]}, {c.clusterConfig.IsReplica(sender), seqID in PreparesRcvdMap(c, v, replicaIdx)}, {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender)}
+ Rejected triggers:
+   {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender).sender} (more specific than {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender)})
+   {sender in PreparesRcvdMap(c, v, replicaIdx)[seqID]} (more specific than {c.clusterConfig.IsReplica(sender), PreparesRcvdMap(c, v, replicaIdx)[seqID]})
+/home/jonh/sbft-formal-verification-model/proof.dfy(191,8): Info: Selected triggers:
+   {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender)}, {sender in PreparesRcvdMap(c, v, replicaIdx)[seqID]}
+ Rejected triggers:
+   {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender).payload.clientOp} (more specific than {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender).payload}, {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender)})
+   {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender).payload} (more specific than {PreparesRcvdFrom(c, v, replicaIdx, seqID, sender)})
+/home/jonh/sbft-formal-verification-model/proof.dfy(203,8): Info: Selected triggers:
+   {CommitsRcvdFrom(c, v, replicaIdx, seqID, sender)}, {sender in CommitsRcvdMap(c, v, replicaIdx)[seqID]}
+ Rejected triggers:
+   {CommitsRcvdFrom(c, v, replicaIdx, seqID, sender).payload.clientOp} (more specific than {CommitsRcvdFrom(c, v, replicaIdx, seqID, sender).payload}, {CommitsRcvdFrom(c, v, replicaIdx, seqID, sender)})
+   {CommitsRcvdFrom(c, v, replicaIdx, seqID, sender).payload} (more specific than {CommitsRcvdFrom(c, v, replicaIdx, seqID, sender)})
+/home/jonh/sbft-formal-verification-model/proof.dfy(215,8): Info: Selected triggers:
+   {commitMsg.sender}, {commitMsg.payload}, {commitMsg in v.network.sentMsgs}
+ Rejected triggers:
+   {QuorumOfPrepares(c.hosts[commitMsg.sender].replicaConstants, v.hosts[commitMsg.sender].replicaVariables, commitMsg.payload.seqID)} (more specific than {commitMsg.payload.seqID}, {v.hosts[commitMsg.sender].replicaVariables}, {v.hosts[commitMsg.sender]}, {c.hosts[commitMsg.sender].replicaConstants}, {c.hosts[commitMsg.sender]}, {commitMsg.sender}, {commitMsg.payload})
+   {commitMsg.payload.seqID} (more specific than {commitMsg.payload})
+   {v.hosts[commitMsg.sender].replicaVariables} (more specific than {v.hosts[commitMsg.sender]}, {commitMsg.sender})
+   {v.hosts[commitMsg.sender]} (more specific than {commitMsg.sender})
+   {c.hosts[commitMsg.sender].replicaConstants} (more specific than {c.hosts[commitMsg.sender]}, {commitMsg.sender})
+   {c.hosts[commitMsg.sender]} (more specific than {commitMsg.sender})
+   {IsHonestReplica(c, commitMsg.sender)} (more specific than {commitMsg.sender})
+   {commitMsg.payload.Commit?} (more specific than {commitMsg.payload})
+/home/jonh/sbft-formal-verification-model/proof.dfy(225,8): Info: For expression "true":
+   Selected triggers:
+     {commitMsg.sender}, {commitMsg.payload}, {commitMsg in v.network.sentMsgs}
+   Rejected triggers:
+     {IsHonestReplica(c, commitMsg.sender)} (more specific than {commitMsg.sender})
+     {commitMsg.payload.Commit?} (more specific than {commitMsg.payload})
+/home/jonh/sbft-formal-verification-model/proof.dfy(225,8): Info: For expression "ghost var recordedPrePrepare: Option<Frame> := PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID); recordedPrePrepare.Some? && commitMsg.payload.clientOp == recordedPrePrepare.value.payload.clientOp":
+   Selected triggers:
+     {commitMsg.payload.seqID}, {commitMsg.sender}, {commitMsg.payload.Commit?}, {commitMsg in v.network.sentMsgs}
+   Rejected triggers:
+     {commitMsg.payload.clientOp} (may loop with "PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value.payload.clientOp")
+     {commitMsg.payload} (may loop with "PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value.payload")
+     {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value.payload.clientOp} (more specific than {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value.payload}, {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value}, {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID)}, {commitMsg.payload.seqID}, {commitMsg.sender})
+     {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value.payload} (more specific than {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value}, {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID)}, {commitMsg.payload.seqID}, {commitMsg.sender})
+     {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).value} (more specific than {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID)}, {commitMsg.payload.seqID}, {commitMsg.sender})
+     {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID).Some?} (more specific than {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID)}, {commitMsg.payload.seqID}, {commitMsg.sender})
+     {PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID)} (more specific than {commitMsg.payload.seqID}, {commitMsg.sender})
+     {IsHonestReplica(c, commitMsg.sender)} (more specific than {commitMsg.sender})
+/home/jonh/sbft-formal-verification-model/proof.dfy(235,8): Info: Selected triggers:
+   {PreparesRcvdFrom(c, v, observer, seqID, sender)}, {PreparesRcvd(c, v, observer, seqID), c.clusterConfig.IsReplica(sender)}, {seqID in PreparesRcvdMap(c, v, observer), c.clusterConfig.IsReplica(sender)}
+ Rejected triggers:
+   {PreparesRcvdFrom(c, v, observer, seqID, sender).payload.view} (more specific than {PreparesRcvdFrom(c, v, observer, seqID, sender).payload}, {PreparesRcvdFrom(c, v, observer, seqID, sender)})
+   {PreparesRcvdFrom(c, v, observer, seqID, sender).payload} (more specific than {PreparesRcvdFrom(c, v, observer, seqID, sender)})
+   {sender in PreparesRcvd(c, v, observer, seqID)} (more specific than {PreparesRcvd(c, v, observer, seqID), c.clusterConfig.IsReplica(sender)})
+/home/jonh/sbft-formal-verification-model/proof.dfy(246,8): Info: For expression "PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).Some?":
+   Selected triggers:
+     {prepare.sender}, {prepare.payload}, {prepare in v.network.sentMsgs}
+   Rejected triggers:
+     {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).Some?} (more specific than {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID)}, {prepare.payload.seqID}, {prepare.sender}, {prepare.payload})
+     {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID)} (more specific than {prepare.payload.seqID}, {prepare.sender}, {prepare.payload})
+     {prepare.payload.seqID} (more specific than {prepare.payload})
+     {ReplicaVariables(c, v, prepare.sender).view} (more specific than {ReplicaVariables(c, v, prepare.sender)}, {prepare.sender})
+     {ReplicaVariables(c, v, prepare.sender)} (more specific than {prepare.sender})
+     {prepare.payload.view} (more specific than {prepare.payload})
+     {IsHonestReplica(c, prepare.sender)} (more specific than {prepare.sender})
+     {prepare.payload.Prepare?} (more specific than {prepare.payload})
+/home/jonh/sbft-formal-verification-model/proof.dfy(246,8): Info: For expression "PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload.clientOp == prepare.payload.clientOp":
+   Selected triggers:
+     {prepare.payload.seqID}, {prepare.payload.view}, {prepare.sender}, {prepare.payload.Prepare?}, {prepare in v.network.sentMsgs}
+   Rejected triggers:
+     {prepare.payload.clientOp} (may loop with "PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload.clientOp")
+     {prepare.payload} (may loop with "PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload")
+     {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload.clientOp} (more specific than {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload}, {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value}, {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID)}, {prepare.payload.seqID}, {prepare.sender})
+     {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload} (more specific than {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value}, {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID)}, {prepare.payload.seqID}, {prepare.sender})
+     {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value} (more specific than {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID)}, {prepare.payload.seqID}, {prepare.sender})
+     {PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID)} (more specific than {prepare.payload.seqID}, {prepare.sender})
+     {ReplicaVariables(c, v, prepare.sender).view} (more specific than {ReplicaVariables(c, v, prepare.sender)}, {prepare.sender})
+     {ReplicaVariables(c, v, prepare.sender)} (more specific than {prepare.sender})
+     {IsHonestReplica(c, prepare.sender)} (more specific than {prepare.sender})
+/home/jonh/sbft-formal-verification-model/proof.dfy(290,4): Info: Selected triggers:
+   {msg.sender}, {msg.payload}, {msg in v.network.sentMsgs}
+ Rejected triggers:
+   {msg.sender in getAllReplicas(c)} (more specific than {msg.sender})
+   {msg.payload.clientOp} (more specific than {msg.payload})
+   {msg.payload.seqID} (more specific than {msg.payload})
+   {msg.payload.view} (more specific than {msg.payload})
+   {msg.payload.Prepare?} (more specific than {msg.payload})
+/home/jonh/sbft-formal-verification-model/proof.dfy(299,4): Info: Selected triggers:
+   {msg.sender}, {msg in msgs}
+/home/jonh/sbft-formal-verification-model/proof.dfy(345,12): Info: Selected triggers: {host in hosts}
+/home/jonh/sbft-formal-verification-model/proof.dfy(346,12): Info: Selected triggers:
+   {c.clusterConfig.IsReplica(host)}, {host in hosts}
+/home/jonh/sbft-formal-verification-model/proof.dfy(355,12): Info: Selected triggers:
+   {c.clusterConfig.IsReplica(host)}, {host in hostsSet}
+/home/jonh/sbft-formal-verification-model/proof.dfy(394,26): Info: Selected triggers: {IsHonestReplica(c, sender)}
+/home/jonh/sbft-formal-verification-model/proof.dfy(408,4): Info: Selected triggers:
+   {msg2.sender, msg1.sender}, {msg2.sender, msg1.payload}, {msg2.sender, msg1 in v'.network.sentMsgs}, {msg1.sender, msg2.payload}, {msg1.sender, msg2 in v'.network.sentMsgs}, {msg2.payload, msg1.payload}, {msg2.payload, msg1 in v'.network.sentMsgs}, {msg1.payload, msg2 in v'.network.sentMsgs}, {msg2 in v'.network.sentMsgs, msg1 in v'.network.sentMsgs}
+ Rejected triggers:
+   {msg2.payload.clientOp, msg1.payload.clientOp} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg1.payload.clientOp, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, IsHonestReplica(c, msg1.sender)} (more specific than {msg2.payload.clientOp, msg1.sender}, {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload})
+   {msg2.payload.clientOp, msg1.sender} (more specific than {msg1.sender, msg2.payload})
+   {msg2.payload.clientOp, msg1.payload.seqID} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg1.payload.seqID, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1.payload.view} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1.payload.Commit?} (more specific than {msg2.payload.clientOp, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.clientOp, msg1 in v'.network.sentMsgs} (more specific than {msg2.payload, msg1 in v'.network.sentMsgs})
+   {msg1.payload.clientOp, IsHonestReplica(c, msg2.sender)} (more specific than {msg1.payload.clientOp, msg2.sender}, {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload})
+   {msg1.payload.clientOp, msg2.sender} (more specific than {msg2.sender, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload.seqID} (more specific than {msg1.payload.clientOp, msg2.payload}, {msg2.payload.seqID, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload.view} (more specific than {msg1.payload.clientOp, msg2.payload}, {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload.Commit?} (more specific than {msg1.payload.clientOp, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.clientOp, msg2 in v'.network.sentMsgs} (more specific than {msg1.payload, msg2 in v'.network.sentMsgs})
+   {IsHonestReplica(c, msg2.sender), IsHonestReplica(c, msg1.sender)} (more specific than {IsHonestReplica(c, msg2.sender), msg1.sender}, {msg2.sender, IsHonestReplica(c, msg1.sender)}, {msg2.sender, msg1.sender})
+   {IsHonestReplica(c, msg2.sender), msg1.sender} (more specific than {msg2.sender, msg1.sender})
+   {IsHonestReplica(c, msg2.sender), msg1.payload.seqID} (more specific than {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload.seqID}, {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1.payload.view} (more specific than {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload.view}, {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1.payload.Commit?} (more specific than {IsHonestReplica(c, msg2.sender), msg1.payload}, {msg2.sender, msg1.payload.Commit?}, {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1.payload} (more specific than {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg2.sender), msg1 in v'.network.sentMsgs} (more specific than {msg2.sender, msg1 in v'.network.sentMsgs})
+   {msg2.sender, IsHonestReplica(c, msg1.sender)} (more specific than {msg2.sender, msg1.sender})
+   {msg2.sender, msg1.payload.seqID} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.view} (more specific than {msg2.sender, msg1.payload})
+   {msg2.sender, msg1.payload.Commit?} (more specific than {msg2.sender, msg1.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.seqID} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.seqID}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.view} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.view}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload.Commit?} (more specific than {IsHonestReplica(c, msg1.sender), msg2.payload}, {msg1.sender, msg2.payload.Commit?}, {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2.payload} (more specific than {msg1.sender, msg2.payload})
+   {IsHonestReplica(c, msg1.sender), msg2 in v'.network.sentMsgs} (more specific than {msg1.sender, msg2 in v'.network.sentMsgs})
+   {msg1.sender, msg2.payload.seqID} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.view} (more specific than {msg1.sender, msg2.payload})
+   {msg1.sender, msg2.payload.Commit?} (more specific than {msg1.sender, msg2.payload})
+   {msg2.payload.seqID, msg1.payload.seqID} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.seqID, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.view} (more specific than {msg2.payload.seqID, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload.Commit?} (more specific than {msg2.payload.seqID, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.seqID, msg1 in v'.network.sentMsgs} (more specific than {msg2.payload, msg1 in v'.network.sentMsgs})
+   {msg1.payload.seqID, msg2.payload.view} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload.Commit?} (more specific than {msg1.payload.seqID, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.seqID, msg2 in v'.network.sentMsgs} (more specific than {msg1.payload, msg2 in v'.network.sentMsgs})
+   {msg2.payload.view, msg1.payload.view} (more specific than {msg2.payload.view, msg1.payload}, {msg1.payload.view, msg2.payload}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload.Commit?} (more specific than {msg2.payload.view, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.view, msg1 in v'.network.sentMsgs} (more specific than {msg2.payload, msg1 in v'.network.sentMsgs})
+   {msg1.payload.view, msg2.payload.Commit?} (more specific than {msg1.payload.view, msg2.payload}, {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.view, msg2 in v'.network.sentMsgs} (more specific than {msg1.payload, msg2 in v'.network.sentMsgs})
+   {msg2.payload.Commit?, msg1.payload.Commit?} (more specific than {msg2.payload.Commit?, msg1.payload}, {msg2.payload, msg1.payload.Commit?}, {msg2.payload, msg1.payload})
+   {msg2.payload.Commit?, msg1.payload} (more specific than {msg2.payload, msg1.payload})
+   {msg2.payload.Commit?, msg1 in v'.network.sentMsgs} (more specific than {msg2.payload, msg1 in v'.network.sentMsgs})
+   {msg2.payload, msg1.payload.Commit?} (more specific than {msg2.payload, msg1.payload})
+   {msg1.payload.Commit?, msg2 in v'.network.sentMsgs} (more specific than {msg1.payload, msg2 in v'.network.sentMsgs})
+/home/jonh/sbft-formal-verification-model/proof.dfy(459,13): Info: Selected triggers:
+   {QuorumOfPreparesInNetwork(c, v', view, seqID, clientOp)}, {QuorumOfPreparesInNetwork(c, v, view, seqID, clientOp)}
+/home/jonh/sbft-formal-verification-model/proof.dfy(462,4): Info: Selected triggers:
+   {QuorumOfPreparesInNetwork(c, v', view, seqID, clientOp)}, {QuorumOfPreparesInNetwork(c, v, view, seqID, clientOp)}
+/home/jonh/sbft-formal-verification-model/proof.dfy(478,4): Info: Selected triggers:
+   {commitMsg.sender}, {commitMsg.payload}, {commitMsg in v'.network.sentMsgs}
+ Rejected triggers:
+   {QuorumOfPreparesInNetwork(c, v', commitMsg.payload.view, commitMsg.payload.seqID, commitMsg.payload.clientOp)} (more specific than {commitMsg.payload.clientOp}, {commitMsg.payload.seqID}, {commitMsg.payload.view}, {commitMsg.payload})
+   {commitMsg.payload.clientOp} (more specific than {commitMsg.payload})
+   {commitMsg.payload.seqID} (more specific than {commitMsg.payload})
+   {commitMsg.payload.view} (more specific than {commitMsg.payload})
+   {IsHonestReplica(c, commitMsg.sender)} (more specific than {commitMsg.sender})
+   {commitMsg.payload.Commit?} (more specific than {commitMsg.payload})
+/home/jonh/sbft-formal-verification-model/proof.dfy(500,16): Info: Selected triggers:
+   {PreparesRcvdFrom(c, v, step.id, commitMsg.payload.seqID, sender)}, {sender in prepareSendersInWorkingWindow}
+ Rejected triggers: {PreparesRcvdFrom(c, v, step.id, commitMsg.payload.seqID, sender) in v.network.sentMsgs} (more specific than {PreparesRcvdFrom(c, v, step.id, commitMsg.payload.seqID, sender)})
+/home/jonh/sbft-formal-verification-model/proof.dfy(502,16): Info: Selected triggers:
+   {sender in prepareSendersFromNetwork}, {sender in prepareSendersInWorkingWindow}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(14,11): Info: decreases theSets
+/home/jonh/sbft-formal-verification-model/proof.dfy(341,11): Info: decreases c, k
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(29,8): Info: {:induction theSets}
+/home/jonh/sbft-formal-verification-model/library/Library.dfy(34,8): Info: {:induction theSets}
