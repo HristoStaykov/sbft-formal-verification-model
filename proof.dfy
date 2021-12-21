@@ -16,7 +16,7 @@ module Proof {
   import Replica
   import opened DistributedSystem
   import opened SafetySpec
-  import Library
+  import opened Library
 
   predicate IsHonestReplica(c:Constants, hostId:HostId) 
   {
@@ -24,14 +24,86 @@ module Proof {
     && c.clusterConfig.IsReplica(hostId)
   }
 
+  type Frame = Network.Message<Messages.Message>
+
+  // Just a shorthand to reduce a repetitive requires stanza
+  predicate RVValid(c:Constants, v:Variables, replicaIdx: HostId)
+  {
+    && v.WF(c)
+    && c.clusterConfig.IsReplica(replicaIdx)
+  }
+
+  // TODO opaque only this thing to hide its map selects
+  function {:opaque} ReplicaVariables(c:Constants, v:Variables, replicaIdx: HostId) : Replica.Variables
+    requires RVValid(c, v, replicaIdx)
+  {
+    v.hosts[replicaIdx].replicaVariables
+  }
+
+  function PrepreparesRcvdMap(c:Constants, v:Variables, replicaIdx: HostId) : imap<Messages.SequenceID, Option<Frame>>
+    requires RVValid(c, v, replicaIdx)
+  {
+    ReplicaVariables(c, v, replicaIdx).workingWindow.prePreparesRcvd
+  }
+
+  function {:opaque} PrepreparesRcvd(c:Constants, v:Variables, replicaIdx: HostId, seqID: Messages.SequenceID) : Option<Frame>
+    requires RVValid(c, v, replicaIdx)
+  {
+    assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd);
+    PrepreparesRcvdMap(c, v, replicaIdx)[seqID]
+  }
+
+  function PreparesRcvdMap(c:Constants, v:Variables, replicaIdx: HostId) : imap<Messages.SequenceID, Replica.PrepareProofSet>
+    requires RVValid(c, v, replicaIdx)
+  {
+    ReplicaVariables(c, v, replicaIdx).workingWindow.preparesRcvd
+  }
+
+  function {:opaque} PreparesRcvd(c:Constants, v:Variables, replicaIdx: HostId, seqID: Messages.SequenceID) : Replica.PrepareProofSet
+    requires RVValid(c, v, replicaIdx)
+  {
+    assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd);
+    PreparesRcvdMap(c, v, replicaIdx)[seqID]
+  }
+
+  function {:opaque} PreparesRcvdFrom(c:Constants, v:Variables, replicaIdx: HostId, seqID: Messages.SequenceID, sender: HostId) : Frame
+    requires RVValid(c, v, replicaIdx)
+  {
+    PreparesRcvd(c, v, replicaIdx, seqID)[sender]
+  }
+
+  function CommitsRcvdMap(c:Constants, v:Variables, replicaIdx: HostId) : imap<Messages.SequenceID, Replica.CommitProofSet>
+    requires RVValid(c, v, replicaIdx)
+  {
+    ReplicaVariables(c, v, replicaIdx).workingWindow.preparesRcvd
+  }
+
+  function {:opaque} CommitsRcvd(c:Constants, v:Variables, replicaIdx: HostId, seqID: Messages.SequenceID) : Replica.CommitProofSet
+    requires RVValid(c, v, replicaIdx)
+  {
+    assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd);
+    CommitsRcvdMap(c, v, replicaIdx)[seqID]
+  }
+
+  function {:opaque} CommitsRcvdFrom(c:Constants, v:Variables, replicaIdx: HostId, seqID: Messages.SequenceID, sender: HostId) : Frame
+    requires RVValid(c, v, replicaIdx)
+  {
+    CommitsRcvd(c, v, replicaIdx, seqID)[sender]
+  }
+
+  function View(c:Constants, v:Variables, replicaIdx: HostId) : nat
+    requires RVValid(c, v, replicaIdx)
+  {
+    ReplicaVariables(c, v, replicaIdx).view
+  }
+
   // Here's a predicate that will be very useful in constructing invariant conjuncts.
   predicate RecordedPrePreparesRecvdCameFromNetwork(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID | 
               && IsHonestReplica(c, replicaIdx)
-              && assert Library.TriggerKeyInFullImap(seqID, v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd);
-                v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some? 
-                :: v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value in v.network.sentMsgs)
+              && PrepreparesRcvd(c, v, replicaIdx, seqID).Some?
+                :: PrepreparesRcvd(c, v, replicaIdx, seqID).value in v.network.sentMsgs)
   }
 
   predicate RecordedPreparesRecvdCameFromNetwork(c:Constants, v:Variables, observer:HostId)
@@ -39,9 +111,8 @@ module Proof {
     && v.WF(c)
     && IsHonestReplica(c, observer)
     && (forall sender, seqID | 
-              && assert Library.TriggerKeyInFullImap(seqID, v.hosts[observer].replicaVariables.workingWindow.preparesRcvd);
-                sender in v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID]
-                :: (&& var msg := v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID][sender];
+                sender in PreparesRcvd(c, v, observer, seqID)
+                :: (&& var msg := PreparesRcvd(c, v, observer, seqID)[sender];
                     && msg in v.network.sentMsgs
                     && msg.sender == sender
                     && msg.payload.seqID == seqID)) // The key we stored matches what is in the msg
@@ -77,7 +148,7 @@ module Proof {
         :: msg1 == msg2)
   }
 
-  predicate {:opaque} HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
+  predicate /*{:opaque}*/ HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
@@ -90,7 +161,7 @@ module Proof {
         :: msg1 == msg2)
   }
 
-  predicate {:opaque} CommitMsgsFromHonestSendersAgree(c:Constants, v:Variables) {
+  predicate /*{:opaque}*/ CommitMsgsFromHonestSendersAgree(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
@@ -107,10 +178,10 @@ module Proof {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
           && IsHonestReplica(c, replicaIdx)
-          && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
-          && seqID in prepareMap
+          && var prepareMap := PreparesRcvdMap(c, v, replicaIdx);
+          && seqID in prepareMap 
           && sender in prepareMap[seqID]
-          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd[seqID][sender].sender == sender
+          :: && PreparesRcvdFrom(c, v, replicaIdx, seqID, sender).sender == sender
              && c.clusterConfig.IsReplica(sender)
         )
   }
@@ -119,29 +190,27 @@ module Proof {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
           && IsHonestReplica(c, replicaIdx)
-          && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
+          && var prepareMap := PreparesRcvdMap(c, v, replicaIdx);
           && seqID in prepareMap
           && sender in prepareMap[seqID]
-          :: && var replicaWorkingWindow := v.hosts[replicaIdx].replicaVariables.workingWindow;
-             && replicaWorkingWindow.prePreparesRcvd[seqID].Some?
-             && replicaWorkingWindow.preparesRcvd[seqID][sender].payload.clientOp
-                == replicaWorkingWindow.prePreparesRcvd[seqID].value.payload.clientOp)
+          :: && PrepreparesRcvd(c, v, replicaIdx, seqID).Some?
+             && PreparesRcvdFrom(c, v, replicaIdx, seqID, sender).payload.clientOp 
+                == PrepreparesRcvd(c, v, replicaIdx, seqID).value.payload.clientOp)
   }
 
-  predicate {:opaque} RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
+  predicate /*{:opaque}*/ RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall replicaIdx, seqID, sender |
           && IsHonestReplica(c, replicaIdx)
-          && var commitMap := v.hosts[replicaIdx].replicaVariables.workingWindow.commitsRcvd;
+          && var commitMap := CommitsRcvdMap(c, v, replicaIdx);
           && seqID in commitMap
           && sender in commitMap[seqID]
-          :: && var replicaWorkingWindow := v.hosts[replicaIdx].replicaVariables.workingWindow;
-             && replicaWorkingWindow.prePreparesRcvd[seqID].Some?
-             && replicaWorkingWindow.commitsRcvd[seqID][sender].payload.clientOp 
-             == replicaWorkingWindow.prePreparesRcvd[seqID].value.payload.clientOp)
+          :: && PrepreparesRcvd(c, v, replicaIdx, seqID).Some?
+             && CommitsRcvdFrom(c, v, replicaIdx, seqID, sender).payload.clientOp 
+                == PrepreparesRcvd(c, v, replicaIdx, seqID).value.payload.clientOp)
   }
 
-  predicate {:opaque} EveryCommitIsSupportedByRecordedPrepares(c:Constants, v:Variables) {
+  predicate /*{:opaque}*/ EveryCommitIsSupportedByRecordedPrepares(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs
                            && commitMsg.payload.Commit?
@@ -151,13 +220,12 @@ module Proof {
                                          commitMsg.payload.seqID))
   }
 
-  predicate {:opaque} EveryCommitClientOpMatchesRecordedPrePrepare(c:Constants, v:Variables) {
+  predicate /*{:opaque}*/ EveryCommitClientOpMatchesRecordedPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs
                            && commitMsg.payload.Commit?
                            && IsHonestReplica(c, commitMsg.sender)
-          :: && var recordedPrePrepare := 
-                v.hosts[commitMsg.sender].replicaVariables.workingWindow.prePreparesRcvd[commitMsg.payload.seqID];
+          :: && var recordedPrePrepare := PrepreparesRcvd(c, v, commitMsg.sender, commitMsg.payload.seqID);
              && recordedPrePrepare.Some?
              && commitMsg.payload.clientOp == recordedPrePrepare.value.payload.clientOp)
   }
@@ -168,10 +236,9 @@ module Proof {
                            && IsHonestReplica(c, observer)
                            && c.clusterConfig.IsReplica(sender)
                            && var replicaVars := v.hosts[observer].replicaVariables;
-                           && seqID in replicaVars.workingWindow.preparesRcvd
-                           && sender in replicaVars.workingWindow.preparesRcvd[seqID]
-                :: && var replicaVars := v.hosts[observer].replicaVariables;
-                   && replicaVars.view == replicaVars.workingWindow.preparesRcvd[seqID][sender].payload.view)
+                           && seqID in PreparesRcvdMap(c, v, observer)
+                           && sender in PreparesRcvd(c, v, observer, seqID)
+                :: ReplicaVariables(c, v, observer).view == PreparesRcvdFrom(c, v, observer, seqID, sender).payload.view)
   }
 
   predicate SentPreparesMatchRecordedPrePrepareIfHostInSameView(c:Constants, v:Variables) {
@@ -180,10 +247,9 @@ module Proof {
                 && prepare in v.network.sentMsgs
                 && prepare.payload.Prepare?
                 && IsHonestReplica(c, prepare.sender)
-                && prepare.payload.view == v.hosts[prepare.sender].replicaVariables.view
-                  :: && var replicaWorkingWindow := v.hosts[prepare.sender].replicaVariables.workingWindow;
-                     && replicaWorkingWindow.prePreparesRcvd[prepare.payload.seqID].Some?
-                     && replicaWorkingWindow.prePreparesRcvd[prepare.payload.seqID].value.payload.clientOp
+                && prepare.payload.view == ReplicaVariables(c, v, prepare.sender).view
+                  :: && PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).Some?
+                     && PrepreparesRcvd(c, v, prepare.sender, prepare.payload.seqID).value.payload.clientOp
                         == prepare.payload.clientOp)
   }
 
@@ -338,7 +404,7 @@ module Proof {
     requires NextStep(c, v, v', step)
     ensures CommitMsgsFromHonestSendersAgree(c, v')
   {
-    reveal_CommitMsgsFromHonestSendersAgree();
+    ////reveal_CommitMsgsFromHonestSendersAgree();
     forall msg1, msg2 | 
       && msg1 in v'.network.sentMsgs 
       && msg2 in v'.network.sentMsgs 
@@ -376,10 +442,10 @@ module Proof {
     ensures CommitMsgsFromHonestSendersAgree(c, v')
   {
     ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
-    reveal_RecordedCommitsClientOpsMatchPrePrepare();
-    reveal_EveryCommitIsSupportedByRecordedPrepares();
-    reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
-    reveal_HonestReplicasLockOnCommitForGivenView();
+    //reveal_RecordedCommitsClientOpsMatchPrePrepare();
+    //reveal_EveryCommitIsSupportedByRecordedPrepares();
+    //reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
+    //reveal_HonestReplicasLockOnCommitForGivenView();
     ProofCommitMsgsFromHonestSendersAgree(c, v, v', step);
   }
 
@@ -430,10 +496,9 @@ module Proof {
         // Prove that the prepares in the working window are a subset of the prepares in the network:
         var prepareSendersFromNetwork := sendersOf(prepares);
         var h_v := v.hosts[step.id];
-        var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.payload.seqID].Keys;
+        var prepareSendersInWorkingWindow := PreparesRcvd(c, v, step.id, commitMsg.payload.seqID).Keys;
         assert (forall sender | sender in prepareSendersInWorkingWindow 
-                              :: && var msg := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.payload.seqID][sender];
-                                 && msg in v.network.sentMsgs);
+                              :: PreparesRcvdFrom(c, v, step.id, commitMsg.payload.seqID, sender) in v.network.sentMsgs);
         assert (forall sender | sender in prepareSendersInWorkingWindow 
                               :: sender in prepareSendersFromNetwork); //Trigger for subset operator
         Library.SubsetCardinality(prepareSendersInWorkingWindow, prepareSendersFromNetwork);
@@ -680,11 +745,11 @@ module Proof {
     //ensures Inv(c, v) ==> Safety(c, v)
   {
     if Init(c, v) {
-      reveal_RecordedCommitsClientOpsMatchPrePrepare();
-      reveal_EveryCommitIsSupportedByRecordedPrepares();
-      reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
-      reveal_HonestReplicasLockOnCommitForGivenView();
-      reveal_CommitMsgsFromHonestSendersAgree();
+      //reveal_RecordedCommitsClientOpsMatchPrePrepare();
+      //reveal_EveryCommitIsSupportedByRecordedPrepares();
+      //reveal_EveryCommitClientOpMatchesRecordedPrePrepare();
+      //reveal_HonestReplicasLockOnCommitForGivenView();
+      //reveal_CommitMsgsFromHonestSendersAgree();
       assert Inv(c, v);
     }
     if Inv(c, v) && Next(c, v, v') {
