@@ -30,22 +30,8 @@ module DistributedSystem {
       && clusterConfig.WF()
       && clusterConfig.ClusterSize() == NumHosts()
       && |hosts| == NumHosts()
-      && (forall id | IsReplica(id) :: hosts[id] == HostConstants.Replica(Replica.Constants(id, clusterConfig)))
-      && (forall id | IsClient(id) :: hosts[id] == HostConstants.Client(Client.Constants(id, clusterConfig)))
-    }
-
-    predicate IsReplica(id:HostId)
-      requires clusterConfig.WF()
-    {
-      && ValidHostId(id)
-      && 0 <= id < clusterConfig.N()
-    }
-
-    predicate IsClient(id:HostId)
-      requires clusterConfig.WF()
-    {
-      && ValidHostId(id)
-      && clusterConfig.N() <= id < NumHosts()
+      && (forall id | clusterConfig.IsReplica(id) :: hosts[id] == HostConstants.Replica(Replica.Constants(id, clusterConfig)))
+      && (forall id | clusterConfig.IsClient(id) :: hosts[id] == HostConstants.Client(Client.Constants(id, clusterConfig)))
     }
   }
 
@@ -56,8 +42,8 @@ module DistributedSystem {
     predicate WF(c: Constants) {
       && c.WF()
       && |hosts| == |c.hosts|
-      && (forall id | c.IsReplica(id) :: hosts[id].Replica? && hosts[id].replicaVariables.WF(c.hosts[id].replicaConstants))
-      && (forall id | c.IsClient(id) :: hosts[id].Client? && hosts[id].clientVariables.WF(c.hosts[id].clientConstants))
+      && (forall id | c.clusterConfig.IsReplica(id) :: hosts[id].Replica? && hosts[id].replicaVariables.WF(c.hosts[id].replicaConstants))
+      && (forall id | c.clusterConfig.IsClient(id) :: hosts[id].Client? && hosts[id].clientVariables.WF(c.hosts[id].clientConstants))
     }
   }
 
@@ -73,9 +59,9 @@ module DistributedSystem {
 
   predicate Init(c:Constants, v:Variables) {
     && v.WF(c)
-    && (forall id | && c.IsReplica(id) 
+    && (forall id | && c.clusterConfig.IsReplica(id) 
                     :: Replica.Init(c.hosts[id].replicaConstants, v.hosts[id].replicaVariables))
-    && (forall id | && c.IsClient(id)
+    && (forall id | && c.clusterConfig.IsClient(id)
                     :: Client.Init(c.hosts[id].clientConstants, v.hosts[id].clientVariables))
     && Network.Init(c.network, v.network)
   }
@@ -86,14 +72,14 @@ module DistributedSystem {
   predicate ReplicaStep(c:Constants, v:Variables, v':Variables, step: Step) {
       && v.WF(c)
       && v'.WF(c)
-      && c.IsReplica(step.id)
+      && c.clusterConfig.IsReplica(step.id)
       && Replica.Next(c.hosts[step.id].replicaConstants, v.hosts[step.id].replicaVariables, v'.hosts[step.id].replicaVariables, step.msgOps)
   }
 
   predicate ClientStep(c:Constants, v:Variables, v':Variables, step: Step) {
       && v.WF(c)
       && v'.WF(c)
-      && c.IsClient(step.id)
+      && c.clusterConfig.IsClient(step.id)
       && Client.Next(c.hosts[step.id].clientConstants, v.hosts[step.id].clientVariables, v'.hosts[step.id].clientVariables, step.msgOps)
   }
 
