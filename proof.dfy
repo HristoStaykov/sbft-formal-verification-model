@@ -62,6 +62,10 @@ module Proof {
           :: QuorumOfPreparesInNetwork(c, v, commitMsg.view, commitMsg.seqID, commitMsg.clientOp) )
   }
 
+  // This predicate states that honest replicas accept the first PrePrepare they receive and vote
+  // with a Prepare message only for it. The lock on Prepare is meant to highlight the fact that
+  // even though a replica can send multiple times a Prepare message for a given Sequence ID for
+  // a given View, this message will not change unless a View Change happens.
   predicate HonestReplicasLockOnPrepareForGivenView(c: Constants, v:Variables)
   {
     && (forall msg1, msg2 | 
@@ -76,6 +80,9 @@ module Proof {
         :: msg1 == msg2)
   }
 
+  // This predicate states that if a replica sends a Commit message for a given Sequence ID for a given View
+  // it will not change its mind, even if it re-sends this message multiple times it will always be the same
+  // for a given View.
   predicate {:opaque} HonestReplicasLockOnCommitForGivenView(c:Constants, v:Variables) {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
