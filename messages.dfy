@@ -32,7 +32,7 @@ module Messages {
                      | Prepare(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
                      | Commit(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
                      | ClientRequest(clientOp:ClientOperation)
-                     | ViewChangeMsg(newView:ViewNum, certificates:map<SequenceID, PreparedCertificate>) // omitting last stable because we don't have checkpointing yet.
+                     | ViewChangeMsg(newView:ViewNum, certificates:imap<SequenceID, PreparedCertificate>) // omitting last stable because we don't have checkpointing yet.
 
   // ToDo: ClientReply
 }
