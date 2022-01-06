@@ -98,13 +98,18 @@ module Replica {
   }
 
   function CurrentPrimary(c:Constants, v:Variables) : nat 
-    requires c.WF()
+    requires v.WF(c)
   {
     v.view % c.clusterConfig.N()
   }
 
-  predicate HaveSufficientVCMsgsToMoveTo(c:Constants, v:Variables, newView:ViewNum) {
-    false
+  predicate HaveSufficientVCMsgsToMoveTo(c:Constants, v:Variables, newView:ViewNum)
+    requires v.WF(c)
+  {
+    && var relevantVCMsgs := set vcMsg | && vcMsg in v.viewChangeMsgsRecvd.msgs 
+                                         && vcMsg.payload.newView >= newView;
+    && |relevantVCMsgs| >= c.clusterConfig.ByzantineSafeQuorum() //F+1
+    && (exists vcMsg :: vcMsg in relevantVCMsgs && vcMsg.payload.newView == newView)
   }
 
   predicate ViewIsActive(c:Constants, v:Variables) {
