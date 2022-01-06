@@ -85,7 +85,6 @@ module Replica {
 
   datatype Variables = Variables(
     view:ViewNum,
-    viewIsActive:bool, //TODO: replace with predicates.
     workingWindow:WorkingWindow,
     viewChangeMsgsRecvd:ViewChangeMsgs
   ) {
@@ -112,16 +111,26 @@ module Replica {
     && (exists vcMsg :: vcMsg in relevantVCMsgs && vcMsg.payload.newView == newView)
   }
 
+  predicate HasCollectedProofMyViewIsAgreed(c:Constants, v:Variables) {
+    && v.WF(c)
+    && var vcMsgsForMyView := set msg | && msg in v.viewChangeMsgsRecvd.msgs 
+                                        && msg.payload.newView == v.view;
+    && ( || v.view == 0 // View 0 is active initially therefore it is initially agreed.
+         || |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())
+  }
+
   predicate ViewIsActive(c:Constants, v:Variables) {
     && v.WF(c)
     && var vcMsgsForHigherView := set msg | && msg in v.viewChangeMsgsRecvd.msgs
                                             && msg.payload.newView > v.view;
     && var vcMsgsForMyView := set msg | && msg in v.viewChangeMsgsRecvd.msgs 
                                         && msg.payload.newView == v.view;
-    && var haveMyVCMsg := exists myVCMsg :: myVCMsg in v.viewChangeMsgsRecvd.msgs && myVCMsg.sender == c.myId;
-
-    && ( || |vcMsgsForHigherView| < c.clusterConfig.ByzantineSafeQuorum() //F+1
-         || (haveMyVCMsg && |vcMsgsForMyView| < c.clusterConfig.AgreementQuorum()))//2F+1
+    && var haveMyVCMsg := exists myVCMsg :: && myVCMsg in v.viewChangeMsgsRecvd.msgs
+                                            && myVCMsg.sender == c.myId
+                                            && myVCMsg.payload.newView == v.view;
+    && |vcMsgsForHigherView| < c.clusterConfig.ByzantineSafeQuorum() //F+1
+    && ( || v.view == 0 // View 0 is active initially. There are no View Change messages for it.
+         || (haveMyVCMsg && |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())) //2F+1
     // TODO: take in account NewViewMsg once we have it in the model
 
   }
@@ -144,7 +153,7 @@ module Replica {
     && v.WF(c)
     && msg.payload.PrePrepare?
     && c.clusterConfig.IsReplica(msg.sender)
-    && v.viewIsActive
+    && ViewIsActive(c, v)
     && msg.payload.view == v.view
     && msg.sender == CurrentPrimary(c, v)
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].None?
@@ -170,7 +179,7 @@ module Replica {
     && v.WF(c)
     && msg.payload.Prepare?
     && c.clusterConfig.IsReplica(msg.sender)
-    && v.viewIsActive
+    && ViewIsActive(c, v)
     && msg.payload.view == v.view
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].Some?
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.clientOp == msg.payload.clientOp
@@ -198,7 +207,7 @@ module Replica {
     && v.WF(c)
     && msg.payload.Commit?
     && c.clusterConfig.IsReplica(msg.sender)
-    && v.viewIsActive
+    && ViewIsActive(c, v)
     && msg.payload.view == v.view
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].Some?
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.clientOp == msg.payload.clientOp
@@ -249,7 +258,7 @@ module Replica {
   {
     && v.WF(c)
     && msgOps.IsSend()
-    && v.viewIsActive
+    && ViewIsActive(c, v)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Network.Message(c.myId,
                                        Prepare(v.view, 
@@ -267,7 +276,7 @@ module Replica {
   {
     && v.WF(c)
     && msgOps.IsSend()
-    && v.viewIsActive
+    && ViewIsActive(c, v)
     && QuorumOfPrepares(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && msgOps.send == Some(Network.Message(c.myId,
@@ -284,14 +293,13 @@ module Replica {
     && msgOps.NoSendRecv()
     // We can only leave a view we have collected at least 2F+1 View 
     // Change messages for in viewChangeMsgsRecvd or View is 0.
-    && (|| newView == v.view + 1
+    && (|| (HasCollectedProofMyViewIsAgreed(c, v) && newView == v.view + 1)
         || HaveSufficientVCMsgsToMoveTo(c, v, newView))
     && var vcMsg := Network.Message(c.myId, ViewChangeMsg(newView, ExtractCertificatesFromWorkingWindow(c, v)));
     && (forall seqID :: seqID in vcMsg.payload.certificates ==> 
            && vcMsg.payload.certificates[seqID].valid() 
            && |vcMsg.payload.certificates[seqID].votes| >= c.clusterConfig.AgreementQuorum())
-    && v' == v.(viewIsActive := false)
-              .(view := newView)
+    && v' == v.(view := newView)
               .(viewChangeMsgsRecvd := v.viewChangeMsgsRecvd.(msgs := v.viewChangeMsgsRecvd.msgs + {vcMsg}))
   }
 
@@ -323,7 +331,6 @@ module Replica {
   
   predicate Init(c:Constants, v:Variables) {
     && v.view == 0
-    && v.viewIsActive == true
     && (forall seqID | seqID in v.workingWindow.committedClientOperations
                 :: v.workingWindow.committedClientOperations[seqID].None?)
     && (forall seqID | seqID in v.workingWindow.prePreparesRcvd
