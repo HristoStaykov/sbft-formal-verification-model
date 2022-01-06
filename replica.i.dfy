@@ -344,6 +344,8 @@ module Replica {
     | DoCommitStep(seqID:SequenceID)
     //| Execute(seqID:SequenceID)
     //| SendReplyToClient(seqID:SequenceID)
+    | LeaveViewStep(newView:ViewNum)
+    | SendViewChangeMsgStep()
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
@@ -354,6 +356,8 @@ module Replica {
        case SendCommitStep(seqID) => SendCommit(c, v, v', msgOps, seqID)
        case RecvCommitStep() => RecvCommit(c, v, v', msgOps)
        case DoCommitStep(seqID) => DoCommit(c, v, v', msgOps, seqID)
+       case LeaveViewStep(newView) => LeaveView(c, v, v', msgOps, newView)
+       case SendViewChangeMsgStep() => SendViewChangeMsg(c, v, v', msgOps)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
