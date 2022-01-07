@@ -297,8 +297,9 @@ module Replica {
         || HaveSufficientVCMsgsToMoveTo(c, v, newView))
     && var vcMsg := Network.Message(c.myId, ViewChangeMsg(newView, ExtractCertificatesFromWorkingWindow(c, v)));
     && (forall seqID :: seqID in vcMsg.payload.certificates ==> 
-           && vcMsg.payload.certificates[seqID].valid() 
-           && |vcMsg.payload.certificates[seqID].votes| >= c.clusterConfig.AgreementQuorum())
+           (|| vcMsg.payload.certificates[seqID].empty()
+            || (&& vcMsg.payload.certificates[seqID].valid() 
+                && |vcMsg.payload.certificates[seqID].votes| >= c.clusterConfig.AgreementQuorum())))
     && v' == v.(view := newView)
               .(viewChangeMsgsRecvd := v.viewChangeMsgsRecvd.(msgs := v.viewChangeMsgsRecvd.msgs + {vcMsg}))
   }
@@ -312,10 +313,9 @@ module Replica {
   function ExtractCertificateForSeqID(c:Constants, v:Variables, seqID:SequenceID) : PreparedCertificate
     requires v.WF(c)
   {
-    if |v.workingWindow.preparesRcvd[seqID].Keys| == 0 
+    if |v.workingWindow.preparesRcvd[seqID].Keys| < c.clusterConfig.AgreementQuorum() 
     then PreparedCertificate({})
     else PreparedCertificate(v.workingWindow.preparesRcvd[seqID].Values)
-    
   }
 
   predicate SendViewChangeMsg(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)

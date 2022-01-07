@@ -25,6 +25,9 @@ module Messages {
                           && v1 != v2
                             :: v1.sender != v2.sender) // unique senders
     }
+    predicate empty() {
+      && |votes| == 0
+    }
   }
 
   // Define your Message datatype here.
