@@ -365,6 +365,29 @@ module Replica {
     && v' == v
   }
 
+  predicate RecvViewChangeMsg(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && v.WF(c)
+    && msgOps.IsRecv()
+    && var msg := msgOps.recv.value;
+    && msg.payload.ViewChangeMsg?
+    && (forall seqID | seqID in msg.payload.certificates
+            :: && msg.payload.certificates[seqID].votes <= msgOps.signatureChecks
+               && (msg.payload.certificates[seqID].valid() || msg.payload.certificates[seqID].empty()))
+    && v' == v.(viewChangeMsgsRecvd := v.viewChangeMsgsRecvd.(msgs := v.viewChangeMsgsRecvd.msgs + {msg}))
+  }
+
+  predicate RecvNewViewMsg(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
+  {
+    && v.WF(c)
+    && msgOps.IsRecv()
+    && var msg := msgOps.recv.value;
+    && msg.payload.NewViewMsg?
+    && msg.payload.vcMsgs.msgs <= msgOps.signatureChecks
+    && msg.payload.vcMsgs.valid(v.view, c.clusterConfig.AgreementQuorum())
+    && v' == v.(newViewMsgsRecvd := v.newViewMsgsRecvd.(msgs := v.newViewMsgsRecvd.msgs + {msg}))
+  }
+
   predicate Init(c:Constants, v:Variables) {
     && v.view == 0
     && (forall seqID | seqID in v.workingWindow.committedClientOperations
@@ -389,8 +412,10 @@ module Replica {
     //| SendReplyToClient(seqID:SequenceID)
     | LeaveViewStep(newView:ViewNum)
     | SendViewChangeMsgStep()
+    | RecvViewChangeMsgStep()
     | SelectQuorumOfViewChangeMsgsStep(viewChangeMsgsSelectedByPrimary:ViewChangeMsgsSelectedByPrimary)
-    | SendNewViewMsg()
+    | SendNewViewMsgStep()
+    | RecvNewViewMsgStep()
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
@@ -403,8 +428,10 @@ module Replica {
        case DoCommitStep(seqID) => DoCommit(c, v, v', msgOps, seqID)
        case LeaveViewStep(newView) => LeaveView(c, v, v', msgOps, newView)
        case SendViewChangeMsgStep() => SendViewChangeMsg(c, v, v', msgOps)
+       case RecvViewChangeMsgStep() => RecvViewChangeMsg(c, v, v', msgOps)
        case SelectQuorumOfViewChangeMsgsStep(viewChangeMsgsSelectedByPrimary) => SelectQuorumOfViewChangeMsgs(c, v, v', msgOps, viewChangeMsgsSelectedByPrimary)
-       case SendNewViewMsg() => SendNewViewMsg(c, v, v', msgOps)
+       case SendNewViewMsgStep() => SendNewViewMsg(c, v, v', msgOps)
+       case RecvNewViewMsgStep() => RecvNewViewMsg(c, v, v', msgOps)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
