@@ -108,7 +108,6 @@ module Replica {
     && var relevantVCMsgs := set vcMsg | && vcMsg in v.viewChangeMsgsRecvd.msgs 
                                          && vcMsg.payload.newView >= newView;
     && |relevantVCMsgs| >= c.clusterConfig.ByzantineSafeQuorum() //F+1
-    && (exists vcMsg :: vcMsg in relevantVCMsgs && vcMsg.payload.newView == newView)
   }
 
   predicate HasCollectedProofMyViewIsAgreed(c:Constants, v:Variables) {
@@ -128,7 +127,6 @@ module Replica {
     && var haveMyVCMsg := exists myVCMsg :: && myVCMsg in v.viewChangeMsgsRecvd.msgs
                                             && myVCMsg.sender == c.myId
                                             && myVCMsg.payload.newView == v.view;
-    && |vcMsgsForHigherView| < c.clusterConfig.ByzantineSafeQuorum() //F+1
     && ( || v.view == 0 // View 0 is active initially. There are no View Change messages for it.
          || (haveMyVCMsg && |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())) //2F+1
     // TODO: take in account NewViewMsg once we have it in the model
