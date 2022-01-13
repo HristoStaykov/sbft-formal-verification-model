@@ -14,7 +14,9 @@ module Replica {
   import opened Messages
   import Network
   import ClusterConfig
-                     
+  
+  datatype OperationWrapper = Noop | ClientOp(clientOperation: ClientOperation)
+
   type PrepareProofSet = map<HostId, Network.Message<Message>> 
   predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet)
     requires c.WF()
@@ -42,7 +44,7 @@ module Replica {
   // to a specific Sequence ID (the Replica has collected the necessary quorum of votes from
   // peers) the Client Operation is inserted in the committedClientOperations as appropriate.
   datatype WorkingWindow = WorkingWindow(
-    committedClientOperations:imap<SequenceID, Option<ClientOperation>>,
+    committedClientOperations:imap<SequenceID, Option<OperationWrapper>>,
     prePreparesRcvd:PrePreparesRcvd,
     preparesRcvd:imap<SequenceID, PrepareProofSet>,
     commitsRcvd:imap<SequenceID, CommitProofSet>
@@ -126,6 +128,17 @@ module Replica {
                                         && msg.payload.newView == v.view;
     && ( || v.view == 0 // View 0 is active initially therefore it is initially agreed.
          || |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())
+  }
+
+  function CalculateRestrictionForSeqID(c:Constants, v:Variables, seqID:SequenceID) : Option<OperationWrapper> {
+    // 1. Take the NewViewMsg for the current View.
+    // 2. Go through all the ViewChangeMsg-s in the NewView and take the valid full 
+    //    PreparedCertificates from them for the seqID.
+    // 3. From all the collected PreparedCertificates take the one with the highest View.
+    // 4. If it is empty  we need to fill with NoOp.
+    // 5. If it contains valid full quorum we take the Client Operation and insist it will be committed in the new View.
+    // var preparedCertificates := set cert | 
+    None
   }
 
   predicate ViewIsActive(c:Constants, v:Variables) {
@@ -247,9 +260,11 @@ module Replica {
     && QuorumOfCommits(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
     && var msg := v.workingWindow.prePreparesRcvd[seqID].value;
+    // TODO: We should be able to commit empty (Noop) operations as well
     && v' == v.(workingWindow := 
                v.workingWindow.(committedClientOperations :=
-                                 v.workingWindow.committedClientOperations[msg.payload.seqID := Some(msg.payload.clientOp)]))
+                                 v.workingWindow.committedClientOperations[msg.payload.seqID := 
+                                                                          Some(ClientOp(msg.payload.clientOp))]))
   }
 
   predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)
@@ -383,7 +398,10 @@ module Replica {
     && msgOps.IsRecv()
     && var msg := msgOps.recv.value;
     && msg.payload.NewViewMsg?
+    && CurrentPrimary(c, v) == msg.sender
+    && msg.payload.newView == v.view
     && msg.payload.vcMsgs.msgs <= msgOps.signatureChecks
+    // Check that all the PreparedCertificates are valid
     && msg.payload.vcMsgs.valid(v.view, c.clusterConfig.AgreementQuorum())
     && v' == v.(newViewMsgsRecvd := v.newViewMsgsRecvd.(msgs := v.newViewMsgsRecvd.msgs + {msg}))
   }
