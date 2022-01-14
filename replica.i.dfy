@@ -107,15 +107,15 @@ module Replica {
   }
 
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a PrePrepare
-  predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, p:Message)
+  predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, msg:Message)
   {
     && v.WF(c)
-    && p.PrePrepare?
-    && c.clusterConfig.IsReplica(p.sender)
+    && msg.PrePrepare?
+    && c.clusterConfig.IsReplica(msg.sender)
     && v.viewIsActive
-    && p.view == v.view
-    && p.sender == CurrentPrimary(c, v)
-    && v.workingWindow.prePreparesRcvd[p.seqID].None?
+    && msg.view == v.view
+    && msg.sender == CurrentPrimary(c, v)
+    && v.workingWindow.prePreparesRcvd[msg.seqID].None?
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrePrepare
@@ -133,16 +133,16 @@ module Replica {
   }
 
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a Prepare
-  predicate IsValidPrepareToAccept(c:Constants, v:Variables, p:Message)
+  predicate IsValidPrepareToAccept(c:Constants, v:Variables, msg:Message)
   {
     && v.WF(c)
-    && p.Prepare?
-    && c.clusterConfig.IsReplica(p.sender)
+    && msg.Prepare?
+    && c.clusterConfig.IsReplica(msg.sender)
     && v.viewIsActive
-    && p.view == v.view
-    && v.workingWindow.prePreparesRcvd[p.seqID].Some?
-    && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
-    && p.sender !in v.workingWindow.preparesRcvd[p.seqID] // We stick to the first vote from a peer.
+    && msg.view == v.view
+    && v.workingWindow.prePreparesRcvd[msg.seqID].Some?
+    && v.workingWindow.prePreparesRcvd[msg.seqID].value.clientOp == msg.clientOp
+    && msg.sender !in v.workingWindow.preparesRcvd[msg.seqID] // We stick to the first vote from a peer.
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrepare
@@ -161,16 +161,16 @@ module Replica {
   }
 
   // 
-  predicate IsValidCommitToAccept(c:Constants, v:Variables, p:Message)
+  predicate IsValidCommitToAccept(c:Constants, v:Variables, msg:Message)
   {
     && v.WF(c)
-    && p.Prepare?
-    && c.clusterConfig.IsReplica(p.sender)
+    && msg.Commit?
+    && c.clusterConfig.IsReplica(msg.sender)
     && v.viewIsActive
-    && p.view == v.view
-    && v.workingWindow.prePreparesRcvd[p.seqID].Some?
-    && v.workingWindow.prePreparesRcvd[p.seqID].value.clientOp == p.clientOp
-    && p.sender !in v.workingWindow.commitsRcvd[p.seqID] // We stick to the first vote from a peer.
+    && msg.view == v.view
+    && v.workingWindow.prePreparesRcvd[msg.seqID].Some?
+    && v.workingWindow.prePreparesRcvd[msg.seqID].value.clientOp == msg.clientOp
+    && msg.sender !in v.workingWindow.commitsRcvd[msg.seqID] // We stick to the first vote from a peer.
   }
 
   predicate RecvCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
