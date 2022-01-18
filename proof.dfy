@@ -623,8 +623,6 @@ module Proof {
   {
     var step :| NextStep(c, v, v', step);
 
-    ProofEveryCommitMsgIsSupportedByAQuorumOfPrepares(c, v, v', step);
-
     if (c.clusterConfig.IsReplica(step.id))
     {
       var h_c := c.hosts[step.id].replicaConstants;
