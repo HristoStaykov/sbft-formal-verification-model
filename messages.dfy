@@ -39,7 +39,7 @@ module Messages {
                           && v2 in msgs
                           && v1 != v2
                             :: v1.sender != v2.sender) // unique senders
-      && |msgs| >= quorumSize
+      && |msgs| == quorumSize
     }
   }
 

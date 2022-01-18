@@ -130,7 +130,15 @@ module Replica {
          || |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())
   }
 
-  function CalculateRestrictionForSeqID(c:Constants, v:Variables, seqID:SequenceID) : Option<OperationWrapper> {
+  function CalculateRestrictionForSeqID(c:Constants, v:Variables, seqID:SequenceID, newViewMsg:Network.Message<Message>) 
+    : Option<OperationWrapper>
+      requires v.WF(c)
+      requires newViewMsg.payload.NewViewMsg?
+      requires newViewMsg.payload.vcMsgs.valid(v.view, c.clusterConfig.AgreementQuorum())
+      // readability:
+      requires newViewMsg.payload.newView == v.view
+      requires CurrentPrimary(c, v) == newViewMsg.sender
+    {
     // 1. Take the NewViewMsg for the current View.
     // 2. Go through all the ViewChangeMsg-s in the NewView and take the valid full 
     //    PreparedCertificates from them for the seqID.
@@ -138,6 +146,17 @@ module Replica {
     // 4. If it is empty  we need to fill with NoOp.
     // 5. If it contains valid full quorum we take the Client Operation and insist it will be committed in the new View.
     // var preparedCertificates := set cert | 
+
+    // var modestEvens := set x | IsModest(x) && IsEven(x);
+
+    var relevantPrepareCertificates := set viewChangeMsg, cert | 
+                                   && viewChangeMsg in newViewMsg.payload.vcMsgs.msgs
+                                   && cert == viewChangeMsg.payload.certificates[seqID] 
+                                     :: cert;
+    var highestViewCert :| && highestViewCert in relevantPrepareCertificates
+                           && (forall cert :: && cert in relevantPrepareCertificates
+                                              && highestViewCert.prototype().view >= cert.prototype().view);
+    
     None
   }
 
