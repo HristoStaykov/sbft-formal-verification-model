@@ -236,15 +236,11 @@ module Proof {
               && msg.sender in getAllReplicas(c)
   }
 
-  function sendersOf(msgs:set<Network.Message<Messages.Message>>) : set<HostIdentifiers.HostId> {
-    set msg | msg in msgs :: msg.sender
-  }
-
   predicate QuorumOfPreparesInNetwork(c:Constants, v:Variables, view:nat, seqID:Messages.SequenceID, 
                                       clientOp:Messages.ClientOperation) {
     && v.WF(c)
     && var prepares := sentPreparesForSeqID(c, v, view, seqID, clientOp);
-    && |sendersOf(prepares)| >= c.clusterConfig.AgreementQuorum()
+    && |Messages.sendersOf(prepares)| >= c.clusterConfig.AgreementQuorum()
     //&& (forall prepare | prepare in prepares :: prepare.clientOp == clientOperation)
   }
 
@@ -265,7 +261,7 @@ module Proof {
     ensures msg1.payload.clientOp == msg2.payload.clientOp
   {
     var prepares1 := sentPreparesForSeqID(c, v, msg1.payload.view, msg1.payload.seqID, msg1.payload.clientOp);
-    var senders1 := sendersOf(prepares1);
+    var senders1 := Messages.sendersOf(prepares1);
     assert |senders1| >= c.clusterConfig.AgreementQuorum();
 
     var h_c := c.hosts[step.id].replicaConstants;
@@ -403,8 +399,8 @@ module Proof {
     forall view, seqID, clientOp | QuorumOfPreparesInNetwork(c, v, view, seqID, clientOp)
                                   ensures QuorumOfPreparesInNetwork(c, v', view, seqID, clientOp)
     {
-      var senders := sendersOf(sentPreparesForSeqID(c, v, view, seqID, clientOp));
-      var senders' := sendersOf(sentPreparesForSeqID(c, v', view, seqID, clientOp));
+      var senders := Messages.sendersOf(sentPreparesForSeqID(c, v, view, seqID, clientOp));
+      var senders' := Messages.sendersOf(sentPreparesForSeqID(c, v', view, seqID, clientOp));
       Library.SubsetCardinality(senders, senders');
     }
   }
@@ -422,9 +418,9 @@ module Proof {
       QuorumOfPreparesInNetwork(c, v', commitMsg.payload.view, commitMsg.payload.seqID, commitMsg.payload.clientOp) {
       if(commitMsg in v.network.sentMsgs) { // the commitMsg has been sent in a previous step
         // In this case, the proof is trivial - we just need to "teach" Dafny about subset cardinality
-        var senders := sendersOf(sentPreparesForSeqID(c, v, commitMsg.payload.view, 
+        var senders := Messages.sendersOf(sentPreparesForSeqID(c, v, commitMsg.payload.view, 
                                                       commitMsg.payload.seqID, commitMsg.payload.clientOp));
-        var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.payload.view,
+        var senders' := Messages.sendersOf(sentPreparesForSeqID(c, v', commitMsg.payload.view,
                                                       commitMsg.payload.seqID, commitMsg.payload.clientOp));
         Library.SubsetCardinality(senders, senders');
       } else { // the commitMsg is being sent in the current step
@@ -435,7 +431,7 @@ module Proof {
         assert prepares == prepares'; // Trigger (hint) - sending a commitMsg does not affect the set of prepares
         
         // Prove that the prepares in the working window are a subset of the prepares in the network:
-        var prepareSendersFromNetwork := sendersOf(prepares);
+        var prepareSendersFromNetwork := Messages.sendersOf(prepares);
         var h_v := v.hosts[step.id];
         var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.payload.seqID].Keys;
         assert (forall sender | sender in prepareSendersInWorkingWindow 

@@ -117,9 +117,10 @@ module Replica {
   predicate HaveSufficientVCMsgsToMoveTo(c:Constants, v:Variables, newView:ViewNum)
     requires v.WF(c)
   {
-    && var relevantVCMsgs := set vcMsg | && vcMsg in v.viewChangeMsgsRecvd.msgs 
+    && var relevantVCMsgs := set vcMsg | && vcMsg in v.viewChangeMsgsRecvd.msgs
                                          && vcMsg.payload.newView >= newView;
-    && |relevantVCMsgs| >= c.clusterConfig.ByzantineSafeQuorum() //F+1
+    && var senders := Messages.sendersOf(relevantVCMsgs);
+    && |senders| >= c.clusterConfig.ByzantineSafeQuorum() //F+1
   }
 
   predicate HasCollectedProofMyViewIsAgreed(c:Constants, v:Variables) {
@@ -147,23 +148,23 @@ module Replica {
     // 5. If it contains valid full quorum we take the Client Operation and insist it will be committed in the new View.
     // var preparedCertificates := set cert | 
 
-    // var modestEvens := set x | IsModest(x) && IsEven(x);
-
     var relevantPrepareCertificates := set viewChangeMsg, cert | 
                                    && viewChangeMsg in newViewMsg.payload.vcMsgs.msgs
                                    && cert == viewChangeMsg.payload.certificates[seqID] 
                                      :: cert;
-    var highestViewCert :| && highestViewCert in relevantPrepareCertificates
+    if |relevantPrepareCertificates| == 0
+    then
+      Some(Noop)
+    else
+      var highestViewCert :| && highestViewCert in relevantPrepareCertificates
                            && (forall cert :: && cert in relevantPrepareCertificates
                                               && highestViewCert.prototype().view >= cert.prototype().view);
+      Some(ClientOp(highestViewCert.prototype().clientOp))
     
-    None
   }
 
   predicate ViewIsActive(c:Constants, v:Variables) {
     && v.WF(c)
-    && var vcMsgsForHigherView := set msg | && msg in v.viewChangeMsgsRecvd.msgs
-                                            && msg.payload.newView > v.view;
     && var vcMsgsForMyView := set msg | && msg in v.viewChangeMsgsRecvd.msgs 
                                         && msg.payload.newView == v.view;
     && var haveMyVCMsg := (exists myVCMsg :: && myVCMsg in v.viewChangeMsgsRecvd.msgs
@@ -339,9 +340,7 @@ module Replica {
         || HaveSufficientVCMsgsToMoveTo(c, v, newView))
     && var vcMsg := Network.Message(c.myId, ViewChangeMsg(newView, ExtractCertificatesFromWorkingWindow(c, v)));
     && (forall seqID :: seqID in vcMsg.payload.certificates ==> 
-           (|| vcMsg.payload.certificates[seqID].empty()
-            || (&& vcMsg.payload.certificates[seqID].valid() 
-                && |vcMsg.payload.certificates[seqID].votes| >= c.clusterConfig.AgreementQuorum())))
+               (vcMsg.payload.certificates[seqID].valid(c.clusterConfig.AgreementQuorum())))
     && v' == v.(view := newView)
               .(viewChangeMsgsRecvd := v.viewChangeMsgsRecvd.(msgs := v.viewChangeMsgsRecvd.msgs + {vcMsg}))
   }
@@ -407,7 +406,7 @@ module Replica {
     && msg.payload.ViewChangeMsg?
     && (forall seqID | seqID in msg.payload.certificates
             :: && msg.payload.certificates[seqID].votes <= msgOps.signatureChecks
-               && (msg.payload.certificates[seqID].valid() || msg.payload.certificates[seqID].empty()))
+               && msg.payload.certificates[seqID].valid(c.clusterConfig.AgreementQuorum()))
     && v' == v.(viewChangeMsgsRecvd := v.viewChangeMsgsRecvd.(msgs := v.viewChangeMsgsRecvd.msgs + {msg}))
   }
 

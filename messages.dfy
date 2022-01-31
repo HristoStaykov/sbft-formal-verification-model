@@ -9,6 +9,10 @@ module Messages {
 
   datatype ClientOperation = ClientOperation(sender:HostId, timestamp:nat)
 
+  function sendersOf(msgs:set<Network.Message<Message>>) : set<HostIdentifiers.HostId> {
+    set msg | msg in msgs :: msg.sender
+  }
+
   datatype PreparedCertificate = PreparedCertificate(votes:set<Network.Message<Message>>) {
     function prototype() : Message 
       requires |votes| > 0
@@ -16,14 +20,16 @@ module Messages {
       var prot :| prot in votes;
       prot.payload
     }
-    predicate valid() {
-      && |votes| > 0
-      && prototype().Prepare?
-      && (forall v | v in votes :: v.payload == prototype()) // messages have to be votes that match eachother by the prototype 
-      && (forall v1, v2 | && v1 in votes
-                          && v2 in votes
-                          && v1 != v2
-                            :: v1.sender != v2.sender) // unique senders
+    predicate valid(quorumSize:nat) {
+      || empty()
+      || (&& |votes| == quorumSize
+          && prototype().Prepare?
+          && (forall v | v in votes :: v.payload == prototype()) // messages have to be votes that match eachother by the prototype 
+          && (forall v1, v2 | && v1 in votes
+                              && v2 in votes
+                              && v1 != v2
+                                :: v1.sender != v2.sender) // unique senders
+          )
     }
     predicate empty() {
       && |votes| == 0
