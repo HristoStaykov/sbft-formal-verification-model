@@ -14,8 +14,6 @@ module Replica {
   import opened Messages
   import Network
   import ClusterConfig
-  
-  datatype OperationWrapper = Noop | ClientOp(clientOperation: ClientOperation)
 
   type PrepareProofSet = map<HostId, Network.Message<Message>> 
   predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet)
@@ -157,10 +155,9 @@ module Replica {
       Some(Noop)
     else
       var highestViewCert :| && highestViewCert in relevantPrepareCertificates
-                           && (forall cert :: && cert in relevantPrepareCertificates
-                                              && highestViewCert.prototype().view >= cert.prototype().view);
-      Some(ClientOp(highestViewCert.prototype().clientOp))
-    
+                             && (forall cert :: && cert in relevantPrepareCertificates
+                                                && highestViewCert.view >= cert.view);
+      Some(highestViewCert.operationFromPastView)
   }
 
   predicate ViewIsActive(c:Constants, v:Variables) {
@@ -354,9 +351,13 @@ module Replica {
   function ExtractCertificateForSeqID(c:Constants, v:Variables, seqID:SequenceID) : PreparedCertificate
     requires v.WF(c)
   {
-    if |v.workingWindow.preparesRcvd[seqID].Keys| < c.clusterConfig.AgreementQuorum() 
-    then PreparedCertificate({})
-    else PreparedCertificate(v.workingWindow.preparesRcvd[seqID].Values)
+    var preparesRecvd := set msg | msg in v.workingWindow.preparesRcvd[seqID].Values && msg.payload.Prepare?;
+    if |preparesRecvd| < c.clusterConfig.AgreementQuorum() 
+    then PreparedCertificate(v.view, Noop, {})
+    else var prototype :| prototype in preparesRecvd;
+         PreparedCertificate(v.view,
+                             OperationWrapper.ClientOp(prototype.payload.clientOp),
+                             preparesRecvd)
   }
 
   predicate SendViewChangeMsg(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
