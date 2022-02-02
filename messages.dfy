@@ -11,30 +11,27 @@ module Messages {
 
   datatype ClientOperation = ClientOperation(sender:HostId, timestamp:nat)
 
-  datatype OperationWrapper = Noop | ClientOp(clientOperation: ClientOperation)
-
   function sendersOf(msgs:set<Network.Message<Message>>) : set<HostIdentifiers.HostId> {
     set msg | msg in msgs :: msg.sender
   }
 
-  datatype PreparedCertificate = PreparedCertificate(view:ViewNum,
-                                                     operationFromPastView:OperationWrapper,
-                                                     votes:set<Network.Message<Message>>) {
+  datatype PreparedCertificate = PreparedCertificate(votes:set<Network.Message<Message>>) {
+    function prototype() : Message 
+      requires |votes| > 0
+    {
+      var prot :| prot in votes;
+      prot.payload
+    }
     predicate valid(quorumSize:nat) {
-      || ( && empty() 
-           && operationFromPastView.Noop? )
-      || ( && |votes| == quorumSize
-           && (forall v1, v2 | && v1 in votes
-                               && v2 in votes
-                               && v1 != v2
-                                 :: v1.sender != v2.sender) // unique senders
-           && (forall v1, v2 | && v1 in votes
-                               && v2 in votes
-                                 :: v1.payload == v2.payload) // messages have to be votes that match eachother
-           && (forall v | v in votes 
-                          :: && v.payload.Prepare?
-                             && view == v.payload.view  
-                             && operationFromPastView == ClientOp(v.payload.clientOp)))
+      || empty()
+      || (&& |votes| == quorumSize
+          && prototype().Prepare?
+          && (forall v | v in votes :: v.payload == prototype()) // messages have to be votes that match eachother by the prototype 
+          && (forall v1, v2 | && v1 in votes
+                              && v2 in votes
+                              && v1 != v2
+                                :: v1.sender != v2.sender) // unique senders
+          )
     }
     predicate empty() {
       && |votes| == 0
@@ -63,7 +60,7 @@ module Messages {
                      | ViewChangeMsg(newView:ViewNum, certificates:imap<SequenceID, PreparedCertificate>) // omitting last stable because we don't have checkpointing yet.
                      | NewViewMsg(newView:ViewNum, vcMsgs:ViewChangeMsgsSelectedByPrimary) {
                        predicate WF() {
-                         && (ViewChangeMsg? ==> Library.FullImap(certificates))
+                         && (ViewChangeMsg? ==> Library.FullImap(certificates)) //TODO: rename TotalImap
                        }
                      }
   // ToDo: ClientReply

@@ -14,6 +14,8 @@ module Replica {
   import opened Messages
   import Network
   import ClusterConfig
+  
+  datatype OperationWrapper = Noop | ClientOp(clientOperation: ClientOperation)
 
   type PrepareProofSet = map<HostId, Network.Message<Message>> 
   predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet)
@@ -146,18 +148,19 @@ module Replica {
     // 5. If it contains valid full quorum we take the Client Operation and insist it will be committed in the new View.
     // var preparedCertificates := set cert | 
 
-    var relevantPrepareCertificates := set viewChangeMsg, cert | 
+    var relevantPrepareCertificates := set viewChangeMsg, cert |
                                    && viewChangeMsg in newViewMsg.payload.vcMsgs.msgs
-                                   && cert == viewChangeMsg.payload.certificates[seqID] 
+                                   && cert == viewChangeMsg.payload.certificates[seqID]
+                                   && !cert.empty()
                                      :: cert;
     if |relevantPrepareCertificates| == 0
     then
       Some(Noop)
     else
       var highestViewCert :| && highestViewCert in relevantPrepareCertificates
-                             && (forall cert :: && cert in relevantPrepareCertificates
-                                                && highestViewCert.view >= cert.view);
-      Some(highestViewCert.operationFromPastView)
+                           && (forall cert :: && cert in relevantPrepareCertificates
+                                              && highestViewCert.prototype().view >= cert.prototype().view);
+      Some(ClientOp(highestViewCert.prototype().clientOp))
   }
 
   predicate ViewIsActive(c:Constants, v:Variables) {
@@ -353,11 +356,8 @@ module Replica {
   {
     var preparesRecvd := set msg | msg in v.workingWindow.preparesRcvd[seqID].Values && msg.payload.Prepare?;
     if |preparesRecvd| < c.clusterConfig.AgreementQuorum() 
-    then PreparedCertificate(v.view, Noop, {})
-    else var prototype :| prototype in preparesRecvd;
-         PreparedCertificate(v.view,
-                             OperationWrapper.ClientOp(prototype.payload.clientOp),
-                             preparesRecvd)
+    then PreparedCertificate({})
+    else PreparedCertificate(preparesRecvd)
   }
 
   predicate SendViewChangeMsg(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
