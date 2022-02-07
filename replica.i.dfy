@@ -15,8 +15,6 @@ module Replica {
   import Network
   import ClusterConfig
   
-  datatype OperationWrapper = Noop | ClientOp(clientOperation: ClientOperation)
-
   type PrepareProofSet = map<HostId, Network.Message<Message>> 
   predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet)
     requires c.WF()
@@ -131,6 +129,29 @@ module Replica {
          || |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())
   }
 
+  // Constructively demonstrate that we can compute the certificate with the highest View.
+  function HighestViewPrepareCertificate(prepareCertificates:set<PreparedCertificate>) : (highestViewCert:PreparedCertificate)
+    requires (forall cert | cert in prepareCertificates :: |cert.votes| > 0 && cert.prototype().Prepare?)
+    requires |prepareCertificates| > 0
+    ensures highestViewCert in prepareCertificates
+    ensures (forall other | other in prepareCertificates ::
+                      highestViewCert.prototype().view >= other.prototype().view)
+  {
+    var any :| any in prepareCertificates;
+    if |prepareCertificates| == 1
+    then Library.SingletonSetAxiom(any, prepareCertificates);
+         any
+    else var rest := prepareCertificates - {any};
+         var highestOfRest := HighestViewPrepareCertificate(rest);
+         if any.prototype().view > highestOfRest.prototype().view 
+         then assert forall other | other in prepareCertificates ::
+                      any.prototype().view >= other.prototype().view;
+              any
+         else assert forall other | other in prepareCertificates ::
+                      highestOfRest.prototype().view >= other.prototype().view;
+         highestOfRest
+  }
+
   function CalculateRestrictionForSeqID(c:Constants, v:Variables, seqID:SequenceID, newViewMsg:Network.Message<Message>) 
     : Option<OperationWrapper>
       requires v.WF(c)
@@ -157,9 +178,7 @@ module Replica {
     then
       Some(Noop)
     else
-      var highestViewCert :| && highestViewCert in relevantPrepareCertificates
-                           && (forall cert :: && cert in relevantPrepareCertificates
-                                              && highestViewCert.prototype().view >= cert.prototype().view);
+      var highestViewCert := HighestViewPrepareCertificate(relevantPrepareCertificates);
       Some(ClientOp(highestViewCert.prototype().clientOp))
   }
 
@@ -198,6 +217,17 @@ module Replica {
     && msg.payload.view == v.view
     && msg.sender == CurrentPrimary(c, v)
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].None?
+    && var newViewMsgs := set msg | && msg in v.newViewMsgsRecvd.msgs 
+                                    && msg.payload.newView == v.view;
+    && (if |newViewMsgs| == 0 
+        then true
+        else && |newViewMsgs| == 1
+             && var newViewMsg :| newViewMsg in newViewMsgs;
+             && Some(msg.payload.operationWrapper) == CalculateRestrictionForSeqID(c, 
+                                                                                   v,
+                                                                                   msg.payload.seqID, 
+                                                                                   newViewMsg))
+
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrePrepare
@@ -306,7 +336,7 @@ module Replica {
     && msgOps.send == Some(Network.Message(c.myId,
                                        Prepare(v.view, 
                                                seqID,
-                                               v.workingWindow.prePreparesRcvd[seqID].value.payload.clientOp)))
+                                               v.workingWindow.prePreparesRcvd[seqID].value.payload.operationWrapper)))
     && assert msgOps.send.value.payload.Prepare?; true
     && v' == v
   }
@@ -325,7 +355,7 @@ module Replica {
     && msgOps.send == Some(Network.Message(c.myId,
                                      Commit(v.view,
                                             seqID,
-                                            v.workingWindow.prePreparesRcvd[seqID].value.payload.clientOp)))
+                                            v.workingWindow.prePreparesRcvd[seqID].value.payload.operationWrapper)))
     && assert msgOps.send.value.payload.Commit?; true
 
     && v' == v

@@ -77,6 +77,18 @@ module Library {
     forall k :: k in im
   }
 
+  lemma SingletonSetAxiom<T>(x:T, s:set<T>) 
+     requires x in s
+     requires |s| == 1
+     ensures s == {x}
+  {
+    forall y | y in s ensures y in {x} {
+      if y!=x { // contradiction proof
+        SubsetCardinality({x,y}, s);
+      }
+    }
+  }
+
   // Warning: Dafny automation black magic.
   // Everything is in a FullImap! But sometimes Dafny seems unable
   // to trigger that forall. (jonh suspects the issue is related to

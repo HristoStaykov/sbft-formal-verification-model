@@ -11,6 +11,8 @@ module Messages {
 
   datatype ClientOperation = ClientOperation(sender:HostId, timestamp:nat)
 
+  datatype OperationWrapper = Noop | ClientOp(clientOperation: ClientOperation)
+
   function sendersOf(msgs:set<Network.Message<Message>>) : set<HostIdentifiers.HostId> {
     set msg | msg in msgs :: msg.sender
   }
@@ -53,9 +55,9 @@ module Messages {
   }
 
   // Define your Message datatype here.
-  datatype Message = | PrePrepare(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
-                     | Prepare(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
-                     | Commit(view:ViewNum, seqID:SequenceID, clientOp:ClientOperation)
+  datatype Message = | PrePrepare(view:ViewNum, seqID:SequenceID, operationWrapper:OperationWrapper)
+                     | Prepare(view:ViewNum, seqID:SequenceID, operationWrapper:OperationWrapper)
+                     | Commit(view:ViewNum, seqID:SequenceID, operationWrapper:OperationWrapper)
                      | ClientRequest(clientOp:ClientOperation)
                      | ViewChangeMsg(newView:ViewNum, certificates:imap<SequenceID, PreparedCertificate>) // omitting last stable because we don't have checkpointing yet.
                      | NewViewMsg(newView:ViewNum, vcMsgs:ViewChangeMsgsSelectedByPrimary) {
