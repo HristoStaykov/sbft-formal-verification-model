@@ -24,10 +24,13 @@ module Messages {
       var prot :| prot in votes;
       prot.payload
     }
+    predicate WF() {
+      (forall v | v in votes :: v.payload.Prepare?)
+    }
     predicate valid(quorumSize:nat) {
       || empty()
       || (&& |votes| == quorumSize
-          && prototype().Prepare?
+          && WF()
           && (forall v | v in votes :: v.payload == prototype()) // messages have to be votes that match eachother by the prototype 
           && (forall v1, v2 | && v1 in votes
                               && v2 in votes

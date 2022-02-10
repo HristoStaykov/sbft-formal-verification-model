@@ -106,10 +106,16 @@ module Replica {
     }
   }
 
+  function PrimaryForView(c:Constants, view:ViewNum) : nat 
+    requires c.WF()
+  {
+    view % c.clusterConfig.N()
+  }
+
   function CurrentPrimary(c:Constants, v:Variables) : nat 
     requires v.WF(c)
   {
-    v.view % c.clusterConfig.N()
+    PrimaryForView(c, v.view)
   }
 
   predicate HaveSufficientVCMsgsToMoveTo(c:Constants, v:Variables, newView:ViewNum)
@@ -131,7 +137,7 @@ module Replica {
 
   // Constructively demonstrate that we can compute the certificate with the highest View.
   function HighestViewPrepareCertificate(prepareCertificates:set<PreparedCertificate>) : (highestViewCert:PreparedCertificate)
-    requires (forall cert | cert in prepareCertificates :: |cert.votes| > 0 && cert.prototype().Prepare?)
+    requires (forall cert | cert in prepareCertificates :: cert.WF() && !cert.empty())
     requires |prepareCertificates| > 0
     ensures highestViewCert in prepareCertificates
     ensures (forall other | other in prepareCertificates ::
@@ -144,12 +150,8 @@ module Replica {
     else var rest := prepareCertificates - {any};
          var highestOfRest := HighestViewPrepareCertificate(rest);
          if any.prototype().view > highestOfRest.prototype().view 
-         then assert forall other | other in prepareCertificates ::
-                      any.prototype().view >= other.prototype().view;
-              any
-         else assert forall other | other in prepareCertificates ::
-                      highestOfRest.prototype().view >= other.prototype().view;
-         highestOfRest
+         then any
+         else highestOfRest
   }
 
   function CalculateRestrictionForSeqID(c:Constants, v:Variables, seqID:SequenceID, newViewMsg:Network.Message<Message>) 
@@ -172,6 +174,7 @@ module Replica {
     var relevantPrepareCertificates := set viewChangeMsg, cert |
                                    && viewChangeMsg in newViewMsg.payload.vcMsgs.msgs
                                    && cert == viewChangeMsg.payload.certificates[seqID]
+                                   && cert.WF()
                                    && !cert.empty()
                                      :: cert;
     if |relevantPrepareCertificates| == 0
@@ -179,13 +182,13 @@ module Replica {
       Some(Noop)
     else
       var highestViewCert := HighestViewPrepareCertificate(relevantPrepareCertificates);
-      Some(ClientOp(highestViewCert.prototype().clientOp))
+      Some(highestViewCert.prototype().operationWrapper)
   }
 
   predicate ViewIsActive(c:Constants, v:Variables) {
     && v.WF(c)
     && var vcMsgsForMyView := set msg | && msg in v.viewChangeMsgsRecvd.msgs 
-                                        && msg.payload.newView == v.view;
+                                        && msg.payload.newView == v.view; // TODO: unique senders
     && var haveMyVCMsg := (exists myVCMsg :: && myVCMsg in v.viewChangeMsgsRecvd.msgs
                                              && myVCMsg.sender == c.myId
                                              && myVCMsg.payload.newView == v.view);
@@ -207,10 +210,21 @@ module Replica {
     && v == v'
   }
 
+  // Node local invariants that we need to satisfy dafny requires. This gets proven as part of the Distributed system invariants.
+  // That is why it can appear as enabling condition, but does not need to be translated to runtime checks to C++.
+  // For this to be safe it has to appear in the main invarinat in the proof.
+  predicate LiteInv(c:Constants, v:Variables) {
+    && v.WF(c)
+    && (forall newViewMsg | newViewMsg in v.newViewMsgsRecvd.msgs ::
+               && newViewMsg.payload.vcMsgs.valid(v.view, c.clusterConfig.AgreementQuorum())
+               && PrimaryForView(c, newViewMsg.payload.newView) == newViewMsg.sender)
+  }
+
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a PrePrepare
   predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, msg:Network.Message<Message>)
   {
     && v.WF(c)
+    && LiteInv(c, v)
     && msg.payload.PrePrepare?
     && c.clusterConfig.IsReplica(msg.sender)
     && ViewIsActive(c, v)
@@ -253,7 +267,7 @@ module Replica {
     && ViewIsActive(c, v)
     && msg.payload.view == v.view
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].Some?
-    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.clientOp == msg.payload.clientOp
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.operationWrapper == msg.payload.operationWrapper
     && msg.sender !in v.workingWindow.preparesRcvd[msg.payload.seqID] // We stick to the first vote from a peer.
   }
 
@@ -281,7 +295,7 @@ module Replica {
     && ViewIsActive(c, v)
     && msg.payload.view == v.view
     && v.workingWindow.prePreparesRcvd[msg.payload.seqID].Some?
-    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.clientOp == msg.payload.clientOp
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.operationWrapper == msg.payload.operationWrapper
     && msg.sender !in v.workingWindow.commitsRcvd[msg.payload.seqID] // We stick to the first vote from a peer.
   }
 
@@ -314,7 +328,7 @@ module Replica {
     && v' == v.(workingWindow := 
                v.workingWindow.(committedClientOperations :=
                                  v.workingWindow.committedClientOperations[msg.payload.seqID := 
-                                                                          Some(ClientOp(msg.payload.clientOp))]))
+                                                                          Some(msg.payload.operationWrapper)]))
   }
 
   predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)

@@ -207,8 +207,16 @@ module Proof {
   //                                       :: prePrepare1 == prePrepare2)
   // }
 
+  predicate AllReplicasLiteInv (c: Constants, v:Variables) {
+    && v.WF(c)
+    && (forall replicaIdx | 0 <= replicaIdx < |c.hosts| && c.clusterConfig.IsReplica(replicaIdx)
+                            :: Replica.LiteInv(c.hosts[replicaIdx].replicaConstants, v.hosts[replicaIdx].replicaVariables))
+  }
+
   predicate Inv(c: Constants, v:Variables) {
     //&& PrePreparesCarrySameClientOpsForGivenSeqID(c, v)
+    // Do not remove, lite invariant about internal honest Node invariants:
+    && AllReplicasLiteInv(c, v)
     && RecordedPreparesHaveValidSenderID(c, v)
     && SentPreparesMatchRecordedPrePrepareIfHostInSameView(c, v)
     && RecordedPrePreparesRecvdCameFromNetwork(c, v)
