@@ -39,7 +39,7 @@ module Network {
   // It can say send.None? to indicate that it doesn't want to transmit a message.
   datatype MessageOps<Payload> = MessageOps(recv:Option<Message<Payload>>, 
                                             send:Option<Message<Payload>>,
-                                            signatureChecks:set<Message<Payload>>) {
+                                            signedMsgsToCheck:set<Message<Payload>>) {
     predicate IsSend()
     {
       && recv.None?
@@ -82,6 +82,6 @@ module Network {
                        + if msgOps.send.Some? && msgOps.send.value.sender == sender
                        then {msgOps.send.value} 
                        else {})
-    && msgOps.signatureChecks <= v.sentMsgs
+    && msgOps.signedMsgsToCheck <= v.sentMsgs
   }
 }
