@@ -51,6 +51,12 @@ module Network {
       && recv.Some?
       && send.None?
     }
+
+    predicate NoSendRecv()
+    {
+      && recv.None?
+      && send.None?
+    }
   }
 
   datatype Constants = Constants  // no constants for network
@@ -59,13 +65,12 @@ module Network {
   // allow it to be delivered over and over.
   // (We don't have packet headers, so duplication, besides being realistic,
   // also doubles as how multiple parties can hear the message.)
-  datatype Variables<Payload> = Variables(correctlySignedMsgs:set<Message<Payload>>,
-                                                   sentMsgs:set<Message<Payload>>)
+  datatype Variables<Payload> = Variables(sentMsgs:set<Message<Payload>> // We only record messages that are not forged.
+                                         )
 
   predicate Init(c: Constants, v: Variables)
   {
     && v.sentMsgs == {}
-    && v.correctlySignedMsgs == {}
   }
 
   predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, sender:HostId)
@@ -73,12 +78,10 @@ module Network {
     // Only allow receipt of a message if we've seen it has been sent.
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
     // Record the sent message, if there was one.
-    && (v'.sentMsgs ==
-        v.sentMsgs + if msgOps.send.Some? then { msgOps.send.value } else {})
-    && (v'.correctlySignedMsgs == v.correctlySignedMsgs 
-                                 + if msgOps.send.Some? && msgOps.send.value.sender == sender
-                                 then {msgOps.send.value} 
-                                 else {})
-    && msgOps.signatureChecks <= v.correctlySignedMsgs
+    && (v'.sentMsgs == v.sentMsgs 
+                       + if msgOps.send.Some? && msgOps.send.value.sender == sender
+                       then {msgOps.send.value} 
+                       else {})
+    && msgOps.signatureChecks <= v.sentMsgs
   }
 }
