@@ -131,8 +131,9 @@ module Replica {
     && v.WF(c)
     && var vcMsgsForMyView := set msg | && msg in v.viewChangeMsgsRecvd.msgs 
                                         && msg.payload.newView == v.view;
+    && var senders := Messages.sendersOf(vcMsgsForMyView);
     && ( || v.view == 0 // View 0 is active initially therefore it is initially agreed.
-         || |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())
+         || |senders| >= c.clusterConfig.AgreementQuorum())
   }
 
   // Constructively demonstrate that we can compute the certificate with the highest View.
@@ -187,15 +188,10 @@ module Replica {
 
   predicate ViewIsActive(c:Constants, v:Variables) {
     && v.WF(c)
-    && var vcMsgsForMyView := set msg | && msg in v.viewChangeMsgsRecvd.msgs 
-                                        && msg.payload.newView == v.view; // TODO: unique senders
-    && var haveMyVCMsg := (exists myVCMsg :: && myVCMsg in v.viewChangeMsgsRecvd.msgs
-                                             && myVCMsg.sender == c.myId
-                                             && myVCMsg.payload.newView == v.view);
+    && var relevantNewViewMsgs := set msg | msg in v.newViewMsgsRecvd.msgs && msg.payload.newView == v.view;
     && ( || v.view == 0 // View 0 is active initially. There are no View Change messages for it.
-         || (haveMyVCMsg && |vcMsgsForMyView| >= c.clusterConfig.AgreementQuorum())) //2F+1
-    // TODO: take in account NewViewMsg once we have it in the model
-
+         || |relevantNewViewMsgs| == 1) // The NewViewMsg that the Primary sends contains in itself the selected Quorum of
+                                        // ViewChangeMsg-s based on which we are going to rebuild the previous View's working window.
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when SendPrePrepare
@@ -450,7 +446,7 @@ module Replica {
     && var msg := msgOps.recv.value;
     && msg.payload.ViewChangeMsg?
     && (forall seqID | seqID in msg.payload.certificates
-            :: && msg.payload.certificates[seqID].votes <= msgOps.signatureChecks
+            :: && msg.payload.certificates[seqID].votes <= msgOps.signedMsgsToCheck
                && msg.payload.certificates[seqID].valid(c.clusterConfig.AgreementQuorum()))
     && v' == v.(viewChangeMsgsRecvd := v.viewChangeMsgsRecvd.(msgs := v.viewChangeMsgsRecvd.msgs + {msg}))
   }
@@ -463,9 +459,11 @@ module Replica {
     && msg.payload.NewViewMsg?
     && CurrentPrimary(c, v) == msg.sender
     && msg.payload.newView == v.view
-    && msg.payload.vcMsgs.msgs <= msgOps.signatureChecks
+    && msg.payload.vcMsgs.msgs <= msgOps.signedMsgsToCheck
     // Check that all the PreparedCertificates are valid
     && msg.payload.vcMsgs.valid(v.view, c.clusterConfig.AgreementQuorum())
+    // We only allow the primary to select 1 set of View Change messages per view.
+    && (forall storedMsg | storedMsg in v.newViewMsgsRecvd.msgs :: msg.payload.newView != storedMsg.payload.newView)
     && v' == v.(newViewMsgsRecvd := v.newViewMsgsRecvd.(msgs := v.newViewMsgsRecvd.msgs + {msg}))
   }
 
@@ -477,6 +475,8 @@ module Replica {
                 :: v.workingWindow.prePreparesRcvd[seqID].None?)
     && (forall seqID | seqID in v.workingWindow.preparesRcvd :: v.workingWindow.preparesRcvd[seqID] == map[])
     && (forall seqID | seqID in v.workingWindow.commitsRcvd :: v.workingWindow.commitsRcvd[seqID] == map[])
+    && v.viewChangeMsgsRecvd.msgs == {}
+    && v.newViewMsgsRecvd.msgs == {}
   }
 
   // JayNF
