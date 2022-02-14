@@ -27,6 +27,9 @@ module HostIdentifiers {
 // the Message type before the Network module. (Contrast with ch05/ex02.)
 module Network {
   import opened Library
+  import opened HostIdentifiers
+
+  datatype Message<Payload(==)> = Message(sender:HostId, payload:Payload)
 
   // A MessageOps is a "binding variable" used to connect a Host's Next step
   // (what message got received, what got sent?) with the Network (only allow
@@ -34,7 +37,9 @@ module Network {
   // Note that both fields are Option. A step predicate can say recv.None?
   // to indicate that it doesn't need to receive a message to occur.
   // It can say send.None? to indicate that it doesn't want to transmit a message.
-  datatype MessageOps<Message> = MessageOps(recv:Option<Message>, send:Option<Message>) {
+  datatype MessageOps<Payload> = MessageOps(recv:Option<Message<Payload>>, 
+                                            send:Option<Message<Payload>>,
+                                            signedMsgsToCheck:set<Message<Payload>>) {
     predicate IsSend()
     {
       && recv.None?
@@ -46,6 +51,12 @@ module Network {
       && recv.Some?
       && send.None?
     }
+
+    predicate NoSendRecv()
+    {
+      && recv.None?
+      && send.None?
+    }
   }
 
   datatype Constants = Constants  // no constants for network
@@ -54,19 +65,23 @@ module Network {
   // allow it to be delivered over and over.
   // (We don't have packet headers, so duplication, besides being realistic,
   // also doubles as how multiple parties can hear the message.)
-  datatype Variables<Message> = Variables(sentMsgs:set<Message>)
+  datatype Variables<Payload> = Variables(sentMsgs:set<Message<Payload>> // We only record messages that are not forged.
+                                         )
 
-  predicate Init<Message>(c: Constants, v: Variables<Message>)
+  predicate Init(c: Constants, v: Variables)
   {
     && v.sentMsgs == {}
   }
 
-  predicate Next<Message>(c: Constants, v: Variables, v': Variables, msgOps: MessageOps)
+  predicate Next(c: Constants, v: Variables, v': Variables, msgOps: MessageOps, sender:HostId)
   {
     // Only allow receipt of a message if we've seen it has been sent.
     && (msgOps.recv.Some? ==> msgOps.recv.value in v.sentMsgs)
     // Record the sent message, if there was one.
-    && v'.sentMsgs ==
-      v.sentMsgs + if msgOps.send.None? then {} else { msgOps.send.value }
+    && (v'.sentMsgs == v.sentMsgs 
+                       + if msgOps.send.Some? && msgOps.send.value.sender == sender
+                       then {msgOps.send.value} 
+                       else {})
+    && msgOps.signedMsgsToCheck <= v.sentMsgs
   }
 }

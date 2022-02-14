@@ -8,10 +8,10 @@ module Messages {
   datatype ClientOperation = ClientOperation(sender:HostId, timestamp:nat)
 
   // Define your Message datatype here.
-  datatype Message = | PrePrepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | Prepare(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | Commit(sender:HostId, view:nat, seqID:SequenceID, clientOp:ClientOperation)
-                     | ClientRequest(sender:HostId, clientOp:ClientOperation)
+  datatype Message = | PrePrepare(view:nat, seqID:SequenceID, clientOp:ClientOperation)
+                     | Prepare(view:nat, seqID:SequenceID, clientOp:ClientOperation)
+                     | Commit(view:nat, seqID:SequenceID, clientOp:ClientOperation)
+                     | ClientRequest(clientOp:ClientOperation)
 
   // ToDo: ClientReply
 }

@@ -15,26 +15,26 @@ module Replica {
   import Network
   import ClusterConfig
                      
-  type PrepareProofSet = map<HostId, Message> 
+  type PrepareProofSet = map<HostId, Network.Message<Message>> 
   predicate PrepareProofSetWF(c:Constants, ps:PrepareProofSet)
     requires c.WF()
   {
-      && forall x | x in ps :: && ps[x].Prepare? 
+      && forall x | x in ps :: && ps[x].payload.Prepare? 
                                && c.clusterConfig.IsReplica(ps[x].sender)
   }
 
-  type CommitProofSet = map<HostId, Message>
+  type CommitProofSet = map<HostId, Network.Message<Message>>
   predicate CommitProofSetWF(c:Constants, cs:CommitProofSet)
     requires c.WF()
   {
-      && forall x | x in cs :: && cs[x].Commit?
+      && forall x | x in cs :: && cs[x].payload.Commit?
                                && c.clusterConfig.IsReplica(cs[x].sender)
   }
 
-  type PrePreparesRcvd = imap<SequenceID, Option<Message>>
+  type PrePreparesRcvd = imap<SequenceID, Option<Network.Message<Message>>>
   predicate PrePreparesRcvdWF(prePreparesRcvd:PrePreparesRcvd) {
     && FullImap(prePreparesRcvd)
-    && (forall x | x in prePreparesRcvd && prePreparesRcvd[x].Some? :: prePreparesRcvd[x].value.PrePrepare?)
+    && (forall x | x in prePreparesRcvd && prePreparesRcvd[x].Some? :: prePreparesRcvd[x].value.payload.PrePrepare?)
   }
 
   // The Working Window data structure. Here Replicas keep the PrePrepare from the Primary
@@ -102,20 +102,20 @@ module Replica {
     && msgOps.IsSend()
     && CurrentPrimary(c, v) == c.myId
     && var msg := msgOps.send.value;
-    && msg.PrePrepare? // We have a liveness bug here, we need some state that says for the client which operation ID-s we have executed
+    && msg.payload.PrePrepare? // We have a liveness bug here, we need some state that says for the client which operation ID-s we have executed
     && v == v'
   }
 
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a PrePrepare
-  predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, msg:Message)
+  predicate IsValidPrePrepareToAccept(c:Constants, v:Variables, msg:Network.Message<Message>)
   {
     && v.WF(c)
-    && msg.PrePrepare?
+    && msg.payload.PrePrepare?
     && c.clusterConfig.IsReplica(msg.sender)
     && v.viewIsActive
-    && msg.view == v.view
+    && msg.payload.view == v.view
     && msg.sender == CurrentPrimary(c, v)
-    && v.workingWindow.prePreparesRcvd[msg.seqID].None?
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].None?
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrePrepare
@@ -129,20 +129,20 @@ module Replica {
     && IsValidPrePrepareToAccept(c, v, msg)
     && v' == v.(workingWindow := 
                 v.workingWindow.(prePreparesRcvd := 
-                                 v.workingWindow.prePreparesRcvd[msg.seqID := Some(msg)]))
+                                 v.workingWindow.prePreparesRcvd[msg.payload.seqID := Some(msg)]))
   }
 
   // For clarity here we have extracted all preconditions that must hold for a Replica to accept a Prepare
-  predicate IsValidPrepareToAccept(c:Constants, v:Variables, msg:Message)
+  predicate IsValidPrepareToAccept(c:Constants, v:Variables, msg:Network.Message<Message>)
   {
     && v.WF(c)
-    && msg.Prepare?
+    && msg.payload.Prepare?
     && c.clusterConfig.IsReplica(msg.sender)
     && v.viewIsActive
-    && msg.view == v.view
-    && v.workingWindow.prePreparesRcvd[msg.seqID].Some?
-    && v.workingWindow.prePreparesRcvd[msg.seqID].value.clientOp == msg.clientOp
-    && msg.sender !in v.workingWindow.preparesRcvd[msg.seqID] // We stick to the first vote from a peer.
+    && msg.payload.view == v.view
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].Some?
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.clientOp == msg.payload.clientOp
+    && msg.sender !in v.workingWindow.preparesRcvd[msg.payload.seqID] // We stick to the first vote from a peer.
   }
 
   // Predicate that describes what is needed and how we mutate the state v into v' when RecvPrepare
@@ -156,21 +156,21 @@ module Replica {
     && IsValidPrepareToAccept(c, v, msg)
     && v' == v.(workingWindow := 
                 v.workingWindow.(preparesRcvd := 
-                                 v.workingWindow.preparesRcvd[msg.seqID := 
-                                 v.workingWindow.preparesRcvd[msg.seqID][msg.sender := msg]]))
+                                 v.workingWindow.preparesRcvd[msg.payload.seqID := 
+                                 v.workingWindow.preparesRcvd[msg.payload.seqID][msg.sender := msg]]))
   }
 
   // 
-  predicate IsValidCommitToAccept(c:Constants, v:Variables, msg:Message)
+  predicate IsValidCommitToAccept(c:Constants, v:Variables, msg:Network.Message<Message>)
   {
     && v.WF(c)
-    && msg.Commit?
+    && msg.payload.Commit?
     && c.clusterConfig.IsReplica(msg.sender)
     && v.viewIsActive
-    && msg.view == v.view
-    && v.workingWindow.prePreparesRcvd[msg.seqID].Some?
-    && v.workingWindow.prePreparesRcvd[msg.seqID].value.clientOp == msg.clientOp
-    && msg.sender !in v.workingWindow.commitsRcvd[msg.seqID] // We stick to the first vote from a peer.
+    && msg.payload.view == v.view
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].Some?
+    && v.workingWindow.prePreparesRcvd[msg.payload.seqID].value.payload.clientOp == msg.payload.clientOp
+    && msg.sender !in v.workingWindow.commitsRcvd[msg.payload.seqID] // We stick to the first vote from a peer.
   }
 
   predicate RecvCommit(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>)
@@ -181,8 +181,8 @@ module Replica {
     && IsValidCommitToAccept(c, v, msg)
     && v' == v.(workingWindow := 
                v.workingWindow.(commitsRcvd :=
-                                 v.workingWindow.commitsRcvd[msg.seqID := 
-                                 v.workingWindow.commitsRcvd[msg.seqID][msg.sender := msg]]))
+                                 v.workingWindow.commitsRcvd[msg.payload.seqID := 
+                                 v.workingWindow.commitsRcvd[msg.payload.seqID][msg.sender := msg]]))
   }
 
   predicate QuorumOfCommits(c:Constants, v:Variables, seqID:SequenceID) {
@@ -201,7 +201,7 @@ module Replica {
     && var msg := v.workingWindow.prePreparesRcvd[seqID].value;
     && v' == v.(workingWindow := 
                v.workingWindow.(committedClientOperations :=
-                                 v.workingWindow.committedClientOperations[msg.seqID := Some(msg.clientOp)]))
+                                 v.workingWindow.committedClientOperations[msg.payload.seqID := Some(msg.payload.clientOp)]))
   }
 
   predicate QuorumOfPrepares(c:Constants, v:Variables, seqID:SequenceID)
@@ -220,8 +220,11 @@ module Replica {
     && msgOps.IsSend()
     && v.viewIsActive
     && v.workingWindow.prePreparesRcvd[seqID].Some?
-    && msgOps.send == Some(Prepare(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
-    && assert msgOps.send.value.Prepare?; true
+    && msgOps.send == Some(Network.Message(c.myId,
+                                       Prepare(v.view, 
+                                               seqID,
+                                               v.workingWindow.prePreparesRcvd[seqID].value.payload.clientOp)))
+    && assert msgOps.send.value.payload.Prepare?; true
     && v' == v
   }
 
@@ -236,8 +239,12 @@ module Replica {
     && v.viewIsActive
     && QuorumOfPrepares(c, v, seqID)
     && v.workingWindow.prePreparesRcvd[seqID].Some?
-    && msgOps.send == Some(Commit(c.myId, v.view, seqID, v.workingWindow.prePreparesRcvd[seqID].value.clientOp))
-    && assert msgOps.send.value.Commit?; true
+    && msgOps.send == Some(Network.Message(c.myId,
+                                     Commit(v.view,
+                                            seqID,
+                                            v.workingWindow.prePreparesRcvd[seqID].value.payload.clientOp)))
+    && assert msgOps.send.value.payload.Commit?; true
+
     && v' == v
   }
   

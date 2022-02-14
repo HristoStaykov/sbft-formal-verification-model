@@ -44,7 +44,7 @@ module Proof {
                 :: (&& var msg := v.hosts[observer].replicaVariables.workingWindow.preparesRcvd[seqID][sender];
                     && msg in v.network.sentMsgs
                     && msg.sender == sender
-                    && msg.seqID == seqID)) // The key we stored matches what is in the msg
+                    && msg.payload.seqID == seqID)) // The key we stored matches what is in the msg
   }
 
   predicate RecordedPreparesInAllHostsRecvdCameFromNetwork(c:Constants, v:Variables) {
@@ -57,9 +57,10 @@ module Proof {
   predicate EveryCommitMsgIsSupportedByAQuorumOfPrepares(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs 
-                           && commitMsg.Commit? 
+                           && commitMsg.payload.Commit? 
                            && IsHonestReplica(c, commitMsg.sender)
-          :: QuorumOfPreparesInNetwork(c, v, commitMsg.view, commitMsg.seqID, commitMsg.clientOp) )
+          :: QuorumOfPreparesInNetwork(c, v, commitMsg.payload.view, 
+                                       commitMsg.payload.seqID, commitMsg.payload.clientOp) )
   }
 
   // This predicate states that honest replicas accept the first PrePrepare they receive and vote
@@ -71,10 +72,10 @@ module Proof {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
-        && msg1.Prepare?
-        && msg2.Prepare?
-        && msg1.view == msg2.view
-        && msg1.seqID == msg2.seqID
+        && msg1.payload.Prepare?
+        && msg2.payload.Prepare?
+        && msg1.payload.view == msg2.payload.view
+        && msg1.payload.seqID == msg2.payload.seqID
         && msg1.sender == msg2.sender
         && IsHonestReplica(c, msg1.sender)
         :: msg1 == msg2)
@@ -87,10 +88,10 @@ module Proof {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
-        && msg1.Commit?
-        && msg2.Commit?
-        && msg1.view == msg2.view
-        && msg1.seqID == msg2.seqID
+        && msg1.payload.Commit?
+        && msg2.payload.Commit?
+        && msg1.payload.view == msg2.payload.view
+        && msg1.payload.seqID == msg2.payload.seqID
         && msg1.sender == msg2.sender
         && IsHonestReplica(c, msg1.sender)
         :: msg1 == msg2)
@@ -100,13 +101,13 @@ module Proof {
     && (forall msg1, msg2 | 
         && msg1 in v.network.sentMsgs 
         && msg2 in v.network.sentMsgs 
-        && msg1.Commit?
-        && msg2.Commit?
-        && msg1.view == msg2.view
-        && msg1.seqID == msg2.seqID
+        && msg1.payload.Commit?
+        && msg2.payload.Commit?
+        && msg1.payload.view == msg2.payload.view
+        && msg1.payload.seqID == msg2.payload.seqID
         && IsHonestReplica(c, msg1.sender)
         && IsHonestReplica(c, msg2.sender)
-        :: msg1.clientOp == msg2.clientOp)
+        :: msg1.payload.clientOp == msg2.payload.clientOp)
   }
 
   predicate RecordedPreparesHaveValidSenderID(c:Constants, v:Variables) {
@@ -128,9 +129,10 @@ module Proof {
           && var prepareMap := v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd;
           && seqID in prepareMap
           && sender in prepareMap[seqID]
-          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some?
-             && v.hosts[replicaIdx].replicaVariables.workingWindow.preparesRcvd[seqID][sender].clientOp
-                == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
+          :: && var replicaWorkingWindow := v.hosts[replicaIdx].replicaVariables.workingWindow;
+             && replicaWorkingWindow.prePreparesRcvd[seqID].Some?
+             && replicaWorkingWindow.preparesRcvd[seqID][sender].payload.clientOp
+                == replicaWorkingWindow.prePreparesRcvd[seqID].value.payload.clientOp)
   }
 
   predicate {:opaque} RecordedCommitsClientOpsMatchPrePrepare(c:Constants, v:Variables) {
@@ -140,30 +142,31 @@ module Proof {
           && var commitMap := v.hosts[replicaIdx].replicaVariables.workingWindow.commitsRcvd;
           && seqID in commitMap
           && sender in commitMap[seqID]
-          :: && v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].Some?
-             && v.hosts[replicaIdx].replicaVariables.workingWindow.commitsRcvd[seqID][sender].clientOp 
-             == v.hosts[replicaIdx].replicaVariables.workingWindow.prePreparesRcvd[seqID].value.clientOp)
+          :: && var replicaWorkingWindow := v.hosts[replicaIdx].replicaVariables.workingWindow;
+             && replicaWorkingWindow.prePreparesRcvd[seqID].Some?
+             && replicaWorkingWindow.commitsRcvd[seqID][sender].payload.clientOp 
+             == replicaWorkingWindow.prePreparesRcvd[seqID].value.payload.clientOp)
   }
 
   predicate {:opaque} EveryCommitIsSupportedByRecordedPrepares(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs
-                           && commitMsg.Commit?
+                           && commitMsg.payload.Commit?
                            && IsHonestReplica(c, commitMsg.sender)
           :: && Replica.QuorumOfPrepares(c.hosts[commitMsg.sender].replicaConstants, 
                                          v.hosts[commitMsg.sender].replicaVariables, 
-                                         commitMsg.seqID))
+                                         commitMsg.payload.seqID))
   }
 
   predicate {:opaque} EveryCommitClientOpMatchesRecordedPrePrepare(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall commitMsg | && commitMsg in v.network.sentMsgs
-                           && commitMsg.Commit?
+                           && commitMsg.payload.Commit?
                            && IsHonestReplica(c, commitMsg.sender)
           :: && var recordedPrePrepare := 
-                v.hosts[commitMsg.sender].replicaVariables.workingWindow.prePreparesRcvd[commitMsg.seqID];
+                v.hosts[commitMsg.sender].replicaVariables.workingWindow.prePreparesRcvd[commitMsg.payload.seqID];
              && recordedPrePrepare.Some?
-             && commitMsg.clientOp == recordedPrePrepare.value.clientOp)
+             && commitMsg.payload.clientOp == recordedPrePrepare.value.payload.clientOp)
   }
 
   predicate RecordedPreparesMatchHostView(c:Constants, v:Variables) {
@@ -175,19 +178,20 @@ module Proof {
                            && seqID in replicaVars.workingWindow.preparesRcvd
                            && sender in replicaVars.workingWindow.preparesRcvd[seqID]
                 :: && var replicaVars := v.hosts[observer].replicaVariables;
-                   && replicaVars.view == replicaVars.workingWindow.preparesRcvd[seqID][sender].view)
+                   && replicaVars.view == replicaVars.workingWindow.preparesRcvd[seqID][sender].payload.view)
   }
 
   predicate SentPreparesMatchRecordedPrePrepareIfHostInSameView(c:Constants, v:Variables) {
     && v.WF(c)
     && (forall prepare | 
                 && prepare in v.network.sentMsgs
-                && prepare.Prepare?
+                && prepare.payload.Prepare?
                 && IsHonestReplica(c, prepare.sender)
-                && prepare.view == v.hosts[prepare.sender].replicaVariables.view
-                  :: && v.hosts[prepare.sender].replicaVariables.workingWindow.prePreparesRcvd[prepare.seqID].Some?
-                     && v.hosts[prepare.sender].replicaVariables.workingWindow.prePreparesRcvd[prepare.seqID].value.clientOp
-                        == prepare.clientOp)
+                && prepare.payload.view == v.hosts[prepare.sender].replicaVariables.view
+                  :: && var replicaWorkingWindow := v.hosts[prepare.sender].replicaVariables.workingWindow;
+                     && replicaWorkingWindow.prePreparesRcvd[prepare.payload.seqID].Some?
+                     && replicaWorkingWindow.prePreparesRcvd[prepare.payload.seqID].value.payload.clientOp
+                        == prepare.payload.clientOp)
   }
 
   // predicate PrePreparesCarrySameClientOpsForGivenSeqID(c:Constants, v:Variables)
@@ -221,18 +225,18 @@ module Proof {
   }
 
   function sentPreparesForSeqID(c: Constants, v:Variables, view:nat, seqID:Messages.SequenceID,
-                                  clientOp:Messages.ClientOperation) : set<Messages.Message> 
+                                  clientOp:Messages.ClientOperation) : set<Network.Message<Messages.Message>> 
     requires v.WF(c)
   {
     set msg | && msg in v.network.sentMsgs 
-              && msg.Prepare?
-              && msg.view == view
-              && msg.seqID == seqID
-              && msg.clientOp == clientOp
+              && msg.payload.Prepare?
+              && msg.payload.view == view
+              && msg.payload.seqID == seqID
+              && msg.payload.clientOp == clientOp
               && msg.sender in getAllReplicas(c)
   }
 
-  function sendersOf(msgs:set<Messages.Message>) : set<HostIdentifiers.HostId> {
+  function sendersOf(msgs:set<Network.Message<Messages.Message>>) : set<HostIdentifiers.HostId> {
     set msg | msg in msgs :: msg.sender
   }
 
@@ -245,22 +249,22 @@ module Proof {
   }
 
   lemma WlogCommitAgreement(c: Constants, v:Variables, v':Variables, step:Step,
-                            msg1:Messages.Message, msg2:Messages.Message)
+                            msg1:Network.Message<Messages.Message>, msg2:Network.Message<Messages.Message>)
     requires Inv(c, v)
     requires NextStep(c, v, v', step)
     requires msg1 in v'.network.sentMsgs 
     requires msg2 in v'.network.sentMsgs 
-    requires msg1.Commit?
-    requires msg2.Commit?
-    requires msg1.view == msg2.view
-    requires msg1.seqID == msg2.seqID
+    requires msg1.payload.Commit?
+    requires msg2.payload.Commit?
+    requires msg1.payload.view == msg2.payload.view
+    requires msg1.payload.seqID == msg2.payload.seqID
     requires msg1 in v.network.sentMsgs
     requires msg2 !in v.network.sentMsgs
     requires IsHonestReplica(c, msg1.sender)
     requires IsHonestReplica(c, msg2.sender)
-    ensures msg1.clientOp == msg2.clientOp
+    ensures msg1.payload.clientOp == msg2.payload.clientOp
   {
-    var prepares1 := sentPreparesForSeqID(c, v, msg1.view, msg1.seqID, msg1.clientOp);
+    var prepares1 := sentPreparesForSeqID(c, v, msg1.payload.view, msg1.payload.seqID, msg1.payload.clientOp);
     var senders1 := sendersOf(prepares1);
     assert |senders1| >= c.clusterConfig.AgreementQuorum();
 
@@ -345,23 +349,23 @@ module Proof {
     forall msg1, msg2 | 
       && msg1 in v'.network.sentMsgs 
       && msg2 in v'.network.sentMsgs 
-      && msg1.Commit?
-      && msg2.Commit?
-      && msg1.view == msg2.view
-      && msg1.seqID == msg2.seqID
+      && msg1.payload.Commit?
+      && msg2.payload.Commit?
+      && msg1.payload.view == msg2.payload.view
+      && msg1.payload.seqID == msg2.payload.seqID
       && IsHonestReplica(c, msg1.sender)
       && IsHonestReplica(c, msg2.sender)
-      ensures msg1.clientOp == msg2.clientOp {
+      ensures msg1.payload.clientOp == msg2.payload.clientOp {
         if(msg1 in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
-          assert msg1.clientOp == msg2.clientOp;
+          assert msg1.payload.clientOp == msg2.payload.clientOp;
         } else if(msg1 !in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
-          assert msg1.clientOp == msg2.clientOp;
+          assert msg1.payload.clientOp == msg2.payload.clientOp;
         } else if(msg1 in v.network.sentMsgs && msg2 !in v.network.sentMsgs) {
           WlogCommitAgreement(c, v, v', step, msg1, msg2);
-          assert msg1.clientOp == msg2.clientOp;
+          assert msg1.payload.clientOp == msg2.payload.clientOp;
         } else if(msg1 !in v.network.sentMsgs && msg2 in v.network.sentMsgs) {
           WlogCommitAgreement(c, v, v', step, msg2, msg1);
-          assert msg1.clientOp == msg2.clientOp;
+          assert msg1.payload.clientOp == msg2.payload.clientOp;
         } else {
           assert false;
         }
@@ -413,25 +417,29 @@ module Proof {
     // A proof of EveryCommitMsgIsSupportedByAQuorumOfPrepares,
     // by selecting an arbitrary commitMsg instance
     forall commitMsg | && commitMsg in v'.network.sentMsgs 
-                       && commitMsg.Commit? 
+                       && commitMsg.payload.Commit?
                        && IsHonestReplica(c, commitMsg.sender) ensures 
-      QuorumOfPreparesInNetwork(c, v', commitMsg.view, commitMsg.seqID, commitMsg.clientOp) {
+      QuorumOfPreparesInNetwork(c, v', commitMsg.payload.view, commitMsg.payload.seqID, commitMsg.payload.clientOp) {
       if(commitMsg in v.network.sentMsgs) { // the commitMsg has been sent in a previous step
         // In this case, the proof is trivial - we just need to "teach" Dafny about subset cardinality
-        var senders := sendersOf(sentPreparesForSeqID(c, v, commitMsg.view, commitMsg.seqID, commitMsg.clientOp));
-        var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.view, commitMsg.seqID, commitMsg.clientOp));
+        var senders := sendersOf(sentPreparesForSeqID(c, v, commitMsg.payload.view, 
+                                                      commitMsg.payload.seqID, commitMsg.payload.clientOp));
+        var senders' := sendersOf(sentPreparesForSeqID(c, v', commitMsg.payload.view,
+                                                      commitMsg.payload.seqID, commitMsg.payload.clientOp));
         Library.SubsetCardinality(senders, senders');
       } else { // the commitMsg is being sent in the current step
-        var prepares := sentPreparesForSeqID(c, v, commitMsg.view, commitMsg.seqID, commitMsg.clientOp);
-        var prepares' := sentPreparesForSeqID(c, v', commitMsg.view, commitMsg.seqID, commitMsg.clientOp);
+        var prepares := sentPreparesForSeqID(c, v, commitMsg.payload.view,
+                                             commitMsg.payload.seqID, commitMsg.payload.clientOp);
+        var prepares' := sentPreparesForSeqID(c, v', commitMsg.payload.view, 
+                                             commitMsg.payload.seqID, commitMsg.payload.clientOp);
         assert prepares == prepares'; // Trigger (hint) - sending a commitMsg does not affect the set of prepares
         
         // Prove that the prepares in the working window are a subset of the prepares in the network:
         var prepareSendersFromNetwork := sendersOf(prepares);
         var h_v := v.hosts[step.id];
-        var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID].Keys;
+        var prepareSendersInWorkingWindow := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.payload.seqID].Keys;
         assert (forall sender | sender in prepareSendersInWorkingWindow 
-                              :: && var msg := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.seqID][sender];
+                              :: && var msg := h_v.replicaVariables.workingWindow.preparesRcvd[commitMsg.payload.seqID][sender];
                                  && msg in v.network.sentMsgs);
         assert (forall sender | sender in prepareSendersInWorkingWindow 
                               :: sender in prepareSendersFromNetwork); //Trigger for subset operator
