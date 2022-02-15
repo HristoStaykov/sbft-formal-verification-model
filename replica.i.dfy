@@ -372,6 +372,7 @@ module Replica {
   }
 
   predicate LeaveView(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, newView:ViewNum) {
+    // TODO: Clear all Working Window after we leave a View.
     && v.WF(c)
     && msgOps.NoSendRecv()
     // We can only leave a view we have collected at least 2F+1 View 
@@ -491,12 +492,13 @@ module Replica {
     | DoCommitStep(seqID:SequenceID)
     //| Execute(seqID:SequenceID)
     //| SendReplyToClient(seqID:SequenceID)
-    | LeaveViewStep(newView:ViewNum)
-    | SendViewChangeMsgStep()
-    | RecvViewChangeMsgStep()
-    | SelectQuorumOfViewChangeMsgsStep(viewChangeMsgsSelectedByPrimary:ViewChangeMsgsSelectedByPrimary)
-    | SendNewViewMsgStep()
-    | RecvNewViewMsgStep()
+    // TODO: uncomment those steps when we start working on the proof
+    // | LeaveViewStep(newView:ViewNum)
+    // | SendViewChangeMsgStep()
+    // | RecvViewChangeMsgStep()
+    // | SelectQuorumOfViewChangeMsgsStep(viewChangeMsgsSelectedByPrimary:ViewChangeMsgsSelectedByPrimary)
+    // | SendNewViewMsgStep()
+    // | RecvNewViewMsgStep()
 
   predicate NextStep(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>, step: Step) {
     match step
@@ -507,12 +509,13 @@ module Replica {
        case SendCommitStep(seqID) => SendCommit(c, v, v', msgOps, seqID)
        case RecvCommitStep() => RecvCommit(c, v, v', msgOps)
        case DoCommitStep(seqID) => DoCommit(c, v, v', msgOps, seqID)
-       case LeaveViewStep(newView) => LeaveView(c, v, v', msgOps, newView)
-       case SendViewChangeMsgStep() => SendViewChangeMsg(c, v, v', msgOps)
-       case RecvViewChangeMsgStep() => RecvViewChangeMsg(c, v, v', msgOps)
-       case SelectQuorumOfViewChangeMsgsStep(viewChangeMsgsSelectedByPrimary) => SelectQuorumOfViewChangeMsgs(c, v, v', msgOps, viewChangeMsgsSelectedByPrimary)
-       case SendNewViewMsgStep() => SendNewViewMsg(c, v, v', msgOps)
-       case RecvNewViewMsgStep() => RecvNewViewMsg(c, v, v', msgOps)
+       // TODO: uncomment those steps when we start working on the proof
+       // case LeaveViewStep(newView) => LeaveView(c, v, v', msgOps, newView)
+       // case SendViewChangeMsgStep() => SendViewChangeMsg(c, v, v', msgOps)
+       // case RecvViewChangeMsgStep() => RecvViewChangeMsg(c, v, v', msgOps)
+       // case SelectQuorumOfViewChangeMsgsStep(viewChangeMsgsSelectedByPrimary) => SelectQuorumOfViewChangeMsgs(c, v, v', msgOps, viewChangeMsgsSelectedByPrimary)
+       // case SendNewViewMsgStep() => SendNewViewMsg(c, v, v', msgOps)
+       // case RecvNewViewMsgStep() => RecvNewViewMsg(c, v, v', msgOps)
   }
 
   predicate Next(c:Constants, v:Variables, v':Variables, msgOps:Network.MessageOps<Message>) {
