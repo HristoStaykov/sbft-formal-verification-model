@@ -77,6 +77,11 @@ module Library {
     forall k :: k in im
   }
 
+  lemma SingletonSetAxiom<T>(x:T, s:set<T>) 
+     requires x in s
+     requires |s| == 1
+     ensures s == {x}
+
   // Warning: Dafny automation black magic.
   // Everything is in a FullImap! But sometimes Dafny seems unable
   // to trigger that forall. (jonh suspects the issue is related to
