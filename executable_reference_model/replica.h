@@ -147,4 +147,26 @@ bool RecvPrepare(Constants c, const Variables& v, Variables& vNext, const Networ
   }
   return false;
 }
+
+bool IsValidCommitToAccept(Constants c, Variables v, NetworkMessage msg) {
+  bool result = v.WF(c)
+       && std::get_if<Commit>(&msg.payload)
+       && c.clusterConfig.IsReplica(msg.sender)
+       && ViewIsActive(c, v)
+       && std::get_if<Commit>(&msg.payload)->view == v.view
+       && v.workingWindow.prePreparesRcvd.find(std::get_if<Commit>(&msg.payload)->seqID) 
+          != v.workingWindow.prePreparesRcvd.end()
+       && std::get_if<Commit>(&v.workingWindow.prePreparesRcvd[std::get_if<Commit>(&msg.payload)->seqID].payload)->operationWrapper == std::get_if<Commit>(&msg.payload)->operationWrapper
+       && v.workingWindow.preparesRcvd[std::get_if<Prepare>(&msg.payload)->seqID].find(msg.sender) != v.workingWindow.commitsRcvd[std::get_if<Commit>(&msg.payload)->seqID].end();
+  return result;
+}
+
+bool RecvCommit(Constants c, const Variables& v, Variables& vNext, const NetworkMessage& msgRecv, NetworkMessage& msgSend) {
+  if(IsValidCommitToAccept(c, v, msgRecv)) {
+    vNext = v;
+    vNext.workingWindow.commitsRcvd[std::get_if<Commit>(&msgRecv.payload)->seqID][msgRecv.sender] = msgRecv;
+    return true;
+  }
+  return false;
+}
 }
