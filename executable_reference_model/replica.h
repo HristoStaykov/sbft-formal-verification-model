@@ -169,4 +169,28 @@ bool RecvCommit(Constants c, const Variables& v, Variables& vNext, const Network
   }
   return false;
 }
+
+bool QuorumOfCommits(Constants c, Variables v, SequenceID seqID) {
+  bool result = v.WF(c)
+       && v.workingWindow.commitsRcvd[seqID].size() >= c.clusterConfig.AgreementQuorum();
+  return result;
+}
+
+bool QuorumOfPrepares(Constants c, Variables v, SequenceID seqID) {
+  bool result = v.WF(c)
+       && v.workingWindow.preparesRcvd[seqID].size() >= c.clusterConfig.AgreementQuorum();
+  return result;
+}
+
+bool DoCommit(Constants c, const Variables& v, Variables& vNext, const NetworkMessage& msgRecv, NetworkMessage& msgSend, SequenceID seqID) {
+  if(QuorumOfPrepares(c, v, seqID) && \
+     QuorumOfCommits(c, v, seqID) && \
+     (v.workingWindow.prePreparesRcvd.find(seqID) != v.workingWindow.prePreparesRcvd.end())) {
+    auto msg = v.workingWindow.prePreparesRcvd.at(seqID);
+    vNext = v;
+    vNext.workingWindow.committedClientOperations[std::get_if<PrePrepare>(&msg.payload)->seqID] = std::get_if<PrePrepare>(&msg.payload)->operationWrapper;
+    return true;
+  }
+  return false;  
+}
 }
